@@ -50,9 +50,18 @@ class _MainPageState extends State<MainPage> {
   }
 
   void accept(WalletRequest r) {
+    if (r.processed) return;
+
     setState(() {
+      if (r.type == 'إزالة نقاط' && r.amount > points) {
+        r.processed = true;
+        r.accepted = false;
+        return;
+      }
+
       r.processed = true;
       r.accepted = true;
+
       if (r.type == 'إضافة نقاط') {
         points += r.amount;
       } else {
@@ -62,6 +71,7 @@ class _MainPageState extends State<MainPage> {
   }
 
   void reject(WalletRequest r) {
+    if (r.processed) return;
     setState(() {
       r.processed = true;
       r.accepted = false;
@@ -85,10 +95,15 @@ class _MainPageState extends State<MainPage> {
     return Scaffold(
       appBar: AppBar(
         centerTitle: true,
-        title: const Text('MERO PLAY',
-            style: TextStyle(color: gold, fontWeight: FontWeight.bold)),
+        title: const Text(
+          'MERO PLAY',
+          style: TextStyle(color: gold, fontWeight: FontWeight.bold),
+        ),
       ),
-      body: pages[tab],
+      body: IndexedStack(
+        index: tab,
+        children: pages,
+      ),
       bottomNavigationBar: NavigationBar(
         backgroundColor: panel,
         selectedIndex: tab,
@@ -96,10 +111,12 @@ class _MainPageState extends State<MainPage> {
         onDestinationSelected: (i) => setState(() => tab = i),
         destinations: const [
           NavigationDestination(icon: Icon(Icons.home), label: 'الرئيسية'),
-          NavigationDestination(icon: Icon(Icons.sports_soccer), label: 'رياضة'),
+          NavigationDestination(
+              icon: Icon(Icons.sports_soccer), label: 'رياضة'),
           NavigationDestination(icon: Icon(Icons.games), label: 'الألعاب'),
           NavigationDestination(icon: Icon(Icons.wallet), label: 'المحفظة'),
-          NavigationDestination(icon: Icon(Icons.admin_panel_settings), label: 'إدارة'),
+          NavigationDestination(
+              icon: Icon(Icons.admin_panel_settings), label: 'إدارة'),
         ],
       ),
     );
@@ -136,9 +153,14 @@ class HomePage extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Icon(Icons.stars, color: gold, size: 45),
-                Text('MERO PLAY',
-                    style: TextStyle(
-                        color: gold, fontSize: 27, fontWeight: FontWeight.bold)),
+                Text(
+                  'MERO PLAY',
+                  style: TextStyle(
+                    color: gold,
+                    fontSize: 27,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 Text('ألعاب ترفيهية • نقاط افتراضية'),
               ],
             ),
@@ -149,25 +171,56 @@ class HomePage extends StatelessWidget {
           child: Column(
             children: [
               const Text('رصيدك التجريبي'),
-              Text('${points.toStringAsFixed(2)} نقطة',
-                  style: const TextStyle(
-                      color: gold, fontSize: 27, fontWeight: FontWeight.bold)),
-              FilledButton(onPressed: goWallet, child: const Text('المحفظة')),
+              Text(
+                '${points.toStringAsFixed(2)} نقطة',
+                style: const TextStyle(
+                  color: gold,
+                  fontSize: 27,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              FilledButton(
+                onPressed: goWallet,
+                child: const Text('المحفظة'),
+              ),
             ],
           ),
         ),
         const Heading('الألعاب المميزة'),
-        GameTile('Sky Run', 'لعبة طيران', Icons.flight,
-            () => openGame(context, const SkyGame())),
-        GameTile('Kamikaze Grid', 'لعبة الخانات والمراحل', Icons.grid_4x4,
-            () => openGame(context, const GridGame())),
-        GameTile('Mines Puzzle', 'تحدي شبكة', Icons.bomb,
-            () => openGame(context, const MinesGame())),
-        GameTile('Lucky Wheel', 'عجلة عشوائية', Icons.casino,
-            () => openGame(context, const WheelGame())),
-        GameTile('High / Low', 'توقع البطاقات', Icons.style,
-            () => openGame(context, const HighLowGame())),
-        FilledButton(onPressed: goGames, child: const Text('عرض جميع الألعاب')),
+        GameTile(
+          'Sky Run',
+          'لعبة طيران',
+          Icons.flight,
+          () => openGame(context, const SkyGame()),
+        ),
+        GameTile(
+          'Kamikaze Grid',
+          'لعبة الخانات والمراحل',
+          Icons.grid_4x4,
+          () => openGame(context, const GridGame()),
+        ),
+        GameTile(
+          'Mines Puzzle',
+          'تحدي شبكة',
+          Icons.warning_amber_rounded,
+          () => openGame(context, const MinesGame()),
+        ),
+        GameTile(
+          'Lucky Wheel',
+          'عجلة عشوائية',
+          Icons.casino,
+          () => openGame(context, const WheelGame()),
+        ),
+        GameTile(
+          'High / Low',
+          'توقع البطاقات',
+          Icons.style,
+          () => openGame(context, const HighLowGame()),
+        ),
+        FilledButton(
+          onPressed: goGames,
+          child: const Text('عرض جميع الألعاب'),
+        ),
       ],
     );
   }
@@ -186,16 +239,36 @@ class GamesPage extends StatelessWidget {
         padding: const EdgeInsets.all(16),
         children: [
           const Heading('الألعاب'),
-          GameTile('Sky Run', 'تحدي طيران', Icons.flight,
-              () => openGame(context, const SkyGame())),
-          GameTile('Kamikaze Grid', 'مراحل وخانات', Icons.grid_4x4,
-              () => openGame(context, const GridGame())),
-          GameTile('Mines Puzzle', 'لوحة 5 × 5', Icons.bomb,
-              () => openGame(context, const MinesGame())),
-          GameTile('Lucky Wheel', 'عجلة', Icons.casino,
-              () => openGame(context, const WheelGame())),
-          GameTile('High / Low', 'بطاقات', Icons.style,
-              () => openGame(context, const HighLowGame())),
+          GameTile(
+            'Sky Run',
+            'تحدي طيران',
+            Icons.flight,
+            () => openGame(context, const SkyGame()),
+          ),
+          GameTile(
+            'Kamikaze Grid',
+            'مراحل وخانات',
+            Icons.grid_4x4,
+            () => openGame(context, const GridGame()),
+          ),
+          GameTile(
+            'Mines Puzzle',
+            'لوحة 5 × 5',
+            Icons.warning_amber_rounded,
+            () => openGame(context, const MinesGame()),
+          ),
+          GameTile(
+            'Lucky Wheel',
+            'عجلة',
+            Icons.casino,
+            () => openGame(context, const WheelGame()),
+          ),
+          GameTile(
+            'High / Low',
+            'بطاقات',
+            Icons.style,
+            () => openGame(context, const HighLowGame()),
+          ),
         ],
       );
 }
@@ -218,27 +291,32 @@ class _SportsPageState extends State<SportsPage> {
         children: [
           const Heading('توقع رياضي ترفيهي'),
           const Box(
-            child: Text('مباراة افتراضية\nالفريق A  ×  الفريق B',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 20)),
+            child: Text(
+              'مباراة افتراضية\nالفريق A  ×  الفريق B',
+              textAlign: TextAlign.center,
+              style: TextStyle(fontSize: 20),
+            ),
           ),
           const Text('اختر توقعًا:'),
           ...['فوز الفريق A', 'تعادل', 'فوز الفريق B']
               .asMap()
               .entries
-              .map((e) => RadioListTile<int>(
-                    value: e.key,
-                    groupValue: choice,
-                    onChanged: saved ? null : (v) => setState(() => choice = v),
-                    title: Text(e.value),
-                  )),
+              .map(
+                (e) => RadioListTile<int>(
+                  value: e.key,
+                  groupValue: choice,
+                  onChanged: saved ? null : (v) => setState(() => choice = v),
+                  title: Text(e.value),
+                ),
+              ),
           FilledButton(
             onPressed: choice == null || saved
                 ? null
                 : () => setState(() => saved = true),
             child: const Text('حفظ التوقع'),
           ),
-          if (saved) const Text('تم حفظ توقعك الترفيهي.'),
+          if (saved)
+            const Box(child: Text('تم حفظ توقعك الترفيهي.')),
         ],
       );
 }
@@ -288,7 +366,9 @@ class WalletPage extends StatelessWidget {
           FilledButton(
             onPressed: () {
               final value = double.tryParse(controller.text);
+
               if (value == null ||
+                  !value.isFinite ||
                   value < 10 ||
                   value > 200 ||
                   (type == 'إزالة نقاط' && value > points)) {
@@ -297,6 +377,7 @@ class WalletPage extends StatelessWidget {
                 );
                 return;
               }
+
               onSend(type, value);
               Navigator.pop(ctx);
             },
@@ -305,6 +386,7 @@ class WalletPage extends StatelessWidget {
         ],
       ),
     );
+
     controller.dispose();
   }
 
@@ -316,9 +398,14 @@ class WalletPage extends StatelessWidget {
             child: Column(
               children: [
                 const Text('رصيد نقاط تجريبي'),
-                Text('${points.toStringAsFixed(2)} نقطة',
-                    style: const TextStyle(
-                        color: gold, fontSize: 30, fontWeight: FontWeight.bold)),
+                Text(
+                  '${points.toStringAsFixed(2)} نقطة',
+                  style: const TextStyle(
+                    color: gold,
+                    fontSize: 30,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
                 const Text('غير قابل للتحويل إلى أموال'),
               ],
             ),
@@ -342,16 +429,22 @@ class WalletPage extends StatelessWidget {
           ),
           const Heading('طلبات المحفظة'),
           if (requests.isEmpty) const Text('لا توجد طلبات'),
-          ...requests.reversed.map((r) => ListTile(
-                title: Text('${r.type} • ${r.amount}'),
-                subtitle: Text(r.processed
+          ...requests.reversed.map(
+            (r) => ListTile(
+              title: Text('${r.type} • ${r.amount}'),
+              subtitle: Text(
+                r.processed
                     ? (r.accepted ? 'مقبول' : 'مرفوض')
-                    : 'قيد المراجعة'),
-                leading: Icon(Icons.circle,
-                    color: r.processed
-                        ? (r.accepted ? Colors.green : Colors.red)
-                        : gold),
-              )),
+                    : 'قيد المراجعة',
+              ),
+              leading: Icon(
+                Icons.circle,
+                color: r.processed
+                    ? (r.accepted ? Colors.green : Colors.red)
+                    : gold,
+              ),
+            ),
+          ),
         ],
       );
 }
@@ -376,33 +469,33 @@ class AdminPage extends StatelessWidget {
           const Text('هذه لوحة محلية تجريبية وليست محمية'),
           if (requests.where((r) => !r.processed).isEmpty)
             const Box(child: Text('لا توجد طلبات معلقة')),
-          ...requests
-              .where((r) => !r.processed)
-              .map((r) => Box(
-                    child: Column(
-                      children: [
-                        Text(r.type),
-                        Text('${r.amount} نقطة'),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: FilledButton(
-                                onPressed: () => onAccept(r),
-                                child: const Text('قبول'),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: OutlinedButton(
-                                onPressed: () => onReject(r),
-                                child: const Text('رفض'),
-                              ),
-                            ),
-                          ],
+          ...requests.where((r) => !r.processed).map(
+            (r) => Box(
+              child: Column(
+                children: [
+                  Text(r.type),
+                  Text('${r.amount} نقطة'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: FilledButton(
+                          onPressed: () => onAccept(r),
+                          child: const Text('قبول'),
                         ),
-                      ],
-                    ),
-                  )),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: OutlinedButton(
+                          onPressed: () => onReject(r),
+                          child: const Text('رفض'),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ),
         ],
       );
 }
@@ -422,8 +515,10 @@ class _SkyGameState extends State<SkyGame> {
   @override
   Widget build(BuildContext context) => GameScreen('Sky Run', [
         const Icon(Icons.flight, color: gold, size: 85),
-        Text('النقاط: $score',
-            style: const TextStyle(color: gold, fontSize: 30)),
+        Text(
+          'النقاط: $score',
+          style: const TextStyle(color: gold, fontSize: 30),
+        ),
         Text(running ? 'الجولة بدأت' : 'ابدأ اللعب'),
         FilledButton(
           onPressed: () => setState(() => running = !running),
@@ -444,7 +539,7 @@ class _SkyGameState extends State<SkyGame> {
       ]);
 }
 
-// لعبة Kamikaze
+// لعبة Kamikaze Grid
 class GridGame extends StatefulWidget {
   const GridGame({super.key});
 
@@ -475,8 +570,10 @@ class _GridGameState extends State<GridGame> {
 
   @override
   Widget build(BuildContext context) => GameScreen('Kamikaze Grid', [
-        Text('المستوى $level • النقاط $score',
-            style: const TextStyle(color: gold)),
+        Text(
+          'المستوى $level • النقاط $score',
+          style: const TextStyle(color: gold),
+        ),
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
@@ -519,13 +616,17 @@ class _GridGameState extends State<GridGame> {
         ),
         Text(lost ? 'انتهى المستوى' : 'اختر الخانات'),
         FilledButton(
-          onPressed: () => setState(resetBoard),
+          onPressed: () => setState(() {
+            level = 1;
+            score = 0;
+            resetBoard();
+          }),
           child: const Text('إعادة اللعب'),
         ),
       ]);
 }
 
-// لعبة Mines
+// لعبة Mines Puzzle
 class MinesGame extends StatefulWidget {
   const MinesGame({super.key});
 
@@ -538,6 +639,12 @@ class _MinesGameState extends State<MinesGame> {
   final opened = <int>{};
   int score = 0;
   bool over = false;
+
+  void newGame() {
+    opened.clear();
+    score = 0;
+    over = false;
+  }
 
   @override
   Widget build(BuildContext context) => GameScreen('Mines Puzzle', [
@@ -564,10 +671,16 @@ class _MinesGameState extends State<MinesGame> {
                     }),
             child: Container(
               decoration: BoxDecoration(
-                  color: panel, borderRadius: BorderRadius.circular(8)),
+                color: opened.contains(i)
+                    ? (bombs.contains(i) ? Colors.red : Colors.green)
+                    : panel,
+                borderRadius: BorderRadius.circular(8),
+              ),
               child: Icon(
                 opened.contains(i)
-                    ? (bombs.contains(i) ? Icons.bomb : Icons.check)
+                    ? (bombs.contains(i)
+                        ? Icons.warning_amber_rounded
+                        : Icons.check)
                     : Icons.question_mark,
                 color: gold,
               ),
@@ -576,11 +689,7 @@ class _MinesGameState extends State<MinesGame> {
         ),
         Text(over ? 'انتهت الجولة' : 'افتح الخانات'),
         FilledButton(
-          onPressed: () => setState(() {
-            opened.clear();
-            score = 0;
-            over = false;
-          }),
+          onPressed: () => setState(newGame),
           child: const Text('لعبة جديدة'),
         ),
       ]);
@@ -596,7 +705,13 @@ class WheelGame extends StatefulWidget {
 
 class _WheelGameState extends State<WheelGame> {
   String result = 'دور العجلة';
-  final options = ['2 نقطة', '5 نقاط', '10 نقاط', 'حاول مرة أخرى', '15 نقطة'];
+  final options = [
+    '2 نقطة',
+    '5 نقاط',
+    '10 نقاط',
+    'حاول مرة أخرى',
+    '15 نقطة',
+  ];
 
   @override
   Widget build(BuildContext context) => GameScreen('Lucky Wheel', [
@@ -626,8 +741,12 @@ class _HighLowGameState extends State<HighLowGame> {
   void guess(bool higher) {
     final next = Random().nextInt(13) + 1;
     final correct = higher ? next > value : next < value;
+
     setState(() {
-      message = correct ? 'صحيح!' : 'خطأ';
+      message = next == value
+          ? 'تعادل'
+          : (correct ? 'صحيح!' : 'خطأ');
+
       if (correct) score += 5;
       value = next;
     });
@@ -636,7 +755,12 @@ class _HighLowGameState extends State<HighLowGame> {
   @override
   Widget build(BuildContext context) => GameScreen('High / Low', [
         Text('النقاط: $score', style: const TextStyle(color: gold)),
-        Box(child: Text('بطاقتك: $value', style: const TextStyle(fontSize: 30))),
+        Box(
+          child: Text(
+            'بطاقتك: $value',
+            style: const TextStyle(fontSize: 30),
+          ),
+        ),
         Text(message),
         Row(
           children: [
@@ -669,6 +793,7 @@ class _HighLowGameState extends State<HighLowGame> {
 // مكونات عامة
 class GameScreen extends StatelessWidget {
   const GameScreen(this.title, this.children, {super.key});
+
   final String title;
   final List<Widget> children;
 
@@ -684,33 +809,43 @@ class GameScreen extends StatelessWidget {
 
 class Box extends StatelessWidget {
   const Box({super.key, required this.child});
+
   final Widget child;
 
   @override
   Widget build(BuildContext context) => Container(
         margin: const EdgeInsets.symmetric(vertical: 6),
         padding: const EdgeInsets.all(14),
-        decoration:
-            BoxDecoration(color: panel, borderRadius: BorderRadius.circular(12)),
+        decoration: BoxDecoration(
+          color: panel,
+          borderRadius: BorderRadius.circular(12),
+        ),
         child: child,
       );
 }
 
 class Heading extends StatelessWidget {
   const Heading(this.text, {super.key});
+
   final String text;
 
   @override
   Widget build(BuildContext context) => Padding(
         padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Text(text,
-            style: const TextStyle(
-                color: gold, fontSize: 20, fontWeight: FontWeight.bold)),
+        child: Text(
+          text,
+          style: const TextStyle(
+            color: gold,
+            fontSize: 20,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       );
 }
 
 class GameTile extends StatelessWidget {
   const GameTile(this.title, this.subtitle, this.icon, this.onTap, {super.key});
+
   final String title, subtitle;
   final IconData icon;
   final VoidCallback onTap;
