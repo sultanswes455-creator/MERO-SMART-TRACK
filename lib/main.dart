@@ -14,10 +14,17 @@ void main() {
 @pragma('vm:entry-point')
 void overlayMain() {
   WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: TrainingOverlay(),
-  ));
+  runApp(
+    MaterialApp(
+      debugShowCheckedModeBanner: false,
+      theme: ThemeData(
+        brightness: Brightness.dark,
+        scaffoldBackgroundColor: Colors.transparent,
+        colorScheme: const ColorScheme.dark(primary: neon),
+      ),
+      home: const TrainingOverlay(),
+    ),
+  );
 }
 
 class SnakApp extends StatelessWidget {
@@ -68,20 +75,21 @@ class _ActivationPageState extends State<ActivationPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       body: Center(
-        child: Padding(
+        child: SingleChildScrollView(
           padding: const EdgeInsets.all(25),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.sports_esports,
-                  color: neon, size: 75),
+              const Icon(Icons.sports_esports, color: neon, size: 75),
               const SizedBox(height: 20),
-              const Text('SNAK TRAINING',
-                  style: TextStyle(
-                    color: neon,
-                    fontSize: 26,
-                    fontWeight: FontWeight.bold,
-                  )),
+              const Text(
+                'SNAK TRAINING',
+                style: TextStyle(
+                  color: neon,
+                  fontSize: 26,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
               const SizedBox(height: 25),
               TextField(
                 controller: code,
@@ -139,12 +147,12 @@ class _HomePageState extends State<HomePage> {
       }
 
       if (!allowed) {
-        setState(() => status = 'يجب منح إذن الظهور فوق التطبيقات');
+        setState(() => status = 'امنح إذن الظهور فوق التطبيقات');
         return;
       }
 
       await FlutterOverlayWindow.showOverlay(
-        height: 390,
+        height: 560,
         width: 320,
         enableDrag: true,
         overlayTitle: 'SNAK TRAINING',
@@ -152,8 +160,8 @@ class _HomePageState extends State<HomePage> {
       );
 
       setState(() => status = 'تم تشغيل النافذة العائمة');
-    } catch (_) {
-      setState(() => status = 'تعذر تشغيل النافذة');
+    } catch (e) {
+      setState(() => status = 'تعذر تشغيل النافذة: $e');
     }
   }
 
@@ -175,11 +183,12 @@ class _HomePageState extends State<HomePage> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.sports_esports,
-                color: neon, size: 75),
+            const Icon(Icons.sports_esports, color: neon, size: 75),
             const SizedBox(height: 20),
-            const Text('مساعد تدريب 8 Ball Pool',
-                style: TextStyle(fontSize: 21)),
+            const Text(
+              'مساعد تدريب 8 Ball Pool',
+              style: TextStyle(fontSize: 21),
+            ),
             const SizedBox(height: 25),
             SizedBox(
               width: double.infinity,
@@ -219,7 +228,7 @@ class TrainingOverlay extends StatefulWidget {
 class _TrainingOverlayState extends State<TrainingOverlay> {
   double angle = 45;
   double power = 65;
-  Offset spin = const Offset(0, 0);
+  Offset spin = Offset.zero;
   bool expanded = true;
   bool showLines = true;
 
@@ -237,122 +246,130 @@ class _TrainingOverlayState extends State<TrainingOverlay> {
             border: Border.all(color: neon, width: 1.5),
             borderRadius: BorderRadius.circular(18),
           ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  const Icon(Icons.circle, color: neon, size: 12),
-                  const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text('SNAK TRAINING',
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  children: [
+                    const Icon(Icons.circle, color: neon, size: 12),
+                    const SizedBox(width: 8),
+                    const Expanded(
+                      child: Text(
+                        'SNAK TRAINING',
                         style: TextStyle(
                           color: neon,
                           fontWeight: FontWeight.bold,
-                        )),
+                        ),
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () =>
+                          setState(() => expanded = !expanded),
+                      icon: Icon(
+                        expanded ? Icons.expand_less : Icons.expand_more,
+                        color: Colors.white,
+                      ),
+                    ),
+                    IconButton(
+                      onPressed: () =>
+                          FlutterOverlayWindow.closeOverlay(),
+                      icon: const Icon(Icons.close, color: Colors.red),
+                    ),
+                  ],
+                ),
+                if (expanded) ...[
+                  const Divider(color: neon),
+                  Text('زاوية التصويب: ${angle.round()}°'),
+                  Slider(
+                    value: angle,
+                    min: 0,
+                    max: 360,
+                    activeColor: neon,
+                    onChanged: (v) => setState(() => angle = v),
                   ),
-                  IconButton(
-                    onPressed: () =>
-                        setState(() => expanded = !expanded),
-                    icon: Icon(
-                      expanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
+                  Text('قوة الضربة: ${power.round()}%'),
+                  Slider(
+                    value: power,
+                    min: 1,
+                    max: 100,
+                    activeColor: neon,
+                    onChanged: (v) => setState(() => power = v),
+                  ),
+                  const SizedBox(height: 8),
+                  const Text(
+                    'مؤشر السبين',
+                    style: TextStyle(color: neon),
+                  ),
+                  GestureDetector(
+                    onPanUpdate: (details) {
+                      setState(() {
+                        spin = Offset(
+                          (spin.dx + details.delta.dx / 45)
+                              .clamp(-1.0, 1.0),
+                          (spin.dy + details.delta.dy / 45)
+                              .clamp(-1.0, 1.0),
+                        );
+                      });
+                    },
+                    child: Container(
+                      width: 110,
+                      height: 110,
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: Colors.white,
+                      ),
+                      child: Stack(
+                        children: [
+                          const Center(
+                            child: CircleAvatar(
+                              radius: 4,
+                              backgroundColor: Colors.black26,
+                            ),
+                          ),
+                          Positioned(
+                            left: 49 + spin.dx * 40 - 6,
+                            top: 49 + spin.dy * 40 - 6,
+                            child: const CircleAvatar(
+                              radius: 7,
+                              backgroundColor: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
-                  IconButton(
-                    onPressed: () =>
-                        FlutterOverlayWindow.closeOverlay(),
-                    icon: const Icon(Icons.close),
+                  const SizedBox(height: 8),
+                  Text(
+                    'X: ${spin.dx.toStringAsFixed(2)}   '
+                    'Y: ${spin.dy.toStringAsFixed(2)}',
+                    style: const TextStyle(color: neon, fontSize: 12),
+                  ),
+                  SwitchListTile(
+                    dense: true,
+                    contentPadding: EdgeInsets.zero,
+                    title: const Text('إظهار خطوط المسار'),
+                    value: showLines,
+                    activeColor: neon,
+                    onChanged: (v) =>
+                        setState(() => showLines = v),
+                  ),
+                  if (showLines)
+                    CustomPaint(
+                      size: const Size(250, 95),
+                      painter: PathPainter(angle, power, spin),
+                    ),
+                  const Text(
+                    '  ،  تتبعاً تلقائياً للكرات.',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 10,
+                    ),
                   ),
                 ],
-              ),
-              if (expanded) ...[
-                Text('زاوية التصويب: ${angle.round()}°'),
-                Slider(
-                  value: angle,
-                  min: 0,
-                  max: 360,
-                  onChanged: (v) => setState(() => angle = v),
-                ),
-                Text('قوة الضربة: ${power.round()}%'),
-                Slider(
-                  value: power,
-                  min: 1,
-                  max: 100,
-                  onChanged: (v) => setState(() => power = v),
-                ),
-                const SizedBox(height: 8),
-                const Text('مؤشر السبين',
-                    style: TextStyle(color: neon)),
-                GestureDetector(
-                  onPanUpdate: (details) {
-                    setState(() {
-                      spin = Offset(
-                        (spin.dx + details.delta.dx / 45)
-                            .clamp(-1.0, 1.0),
-                        (spin.dy + details.delta.dy / 45)
-                            .clamp(-1.0, 1.0),
-                      );
-                    });
-                  },
-                  child: Container(
-                    width: 105,
-                    height: 105,
-                    decoration: const BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white,
-                    ),
-                    child: Stack(
-                      children: [
-                        const Center(
-                          child: CircleAvatar(
-                            radius: 4,
-                            backgroundColor: Colors.black26,
-                          ),
-                        ),
-                        Positioned(
-                          left: 50 + spin.dx * 40 - 6,
-                          top: 50 + spin.dy * 40 - 6,
-                          child: const CircleAvatar(
-                            radius: 6,
-                            backgroundColor: Colors.red,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  'السبين X: ${spin.dx.toStringAsFixed(2)}'
-                  '  Y: ${spin.dy.toStringAsFixed(2)}',
-                  style: const TextStyle(color: neon, fontSize: 11),
-                ),
-                SwitchListTile(
-                  dense: true,
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('إظهار خطوط المسار'),
-                  value: showLines,
-                  activeColor: neon,
-                  onChanged: (v) =>
-                      setState(() => showLines = v),
-                ),
-                if (showLines)
-                  CustomPaint(
-                    size: const Size(250, 95),
-                    painter: PathPainter(angle, power, spin),
-                  ),
-                const Text(
-                  'المسارات المعروضة تجريبية وليست كشفاً تلقائياً للكرات.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white54,
-                    fontSize: 10,
-                  ),
-                ),
               ],
-            ],
+            ),
           ),
         ),
       ),
@@ -389,20 +406,15 @@ class PathPainter extends CustomPainter {
       paint,
     );
 
-    final secondPaint = Paint()
+    final spinPaint = Paint()
       ..color = Colors.orange
-      ..strokeWidth = 2
-      ..strokeCap = StrokeCap.round;
-
-    final spinOffset = Offset(
-      spin.dx * 15,
-      spin.dy * 15,
-    );
+      ..strokeWidth = 2;
 
     canvas.drawLine(
       center + direction * length,
-      center + direction * length + spinOffset,
-      secondPaint,
+      center + direction * length +
+          Offset(spin.dx * 15, spin.dy * 15),
+      spinPaint,
     );
 
     canvas.drawCircle(
