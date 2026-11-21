@@ -1,11 +1,25 @@
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() => runApp(const MeroAI());
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: 'https://vdddnvamjsikwmuwghuo.supabase.co',
+    anonKey: 'sb_publishable_2pRqaOQ6w0J_tA6zKyGAgQ_fR0eNOjc',
+  );
+
+  try {
+    await Supabase.instance.client.auth.signInAnonymously();
+  } catch (_) {}
+
+  runApp(const MeroAI());
+}
 
 const gold = Color(0xFFFFC400);
-const bg = Color(0xFF0B0C0F);
-const panel = Color(0xFF191A1E);
+const bg = Color(0xFF101113);
+const panel = Color(0xFF222326);
 
 class MeroAI extends StatelessWidget {
   const MeroAI({super.key});
@@ -13,440 +27,241 @@ class MeroAI extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'MERO AI',
       debugShowCheckedModeBanner: false,
-      theme: ThemeData(
-        brightness: Brightness.dark,
+      title: 'MERO AI',
+      theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: bg,
         colorScheme: const ColorScheme.dark(primary: gold),
-        appBarTheme: const AppBarTheme(backgroundColor: bg),
       ),
-      home: const Home(),
+      home: const HomePage(),
     );
   }
 }
 
-class Home extends StatefulWidget {
-  const Home({super.key});
+class HomePage extends StatefulWidget {
+  const HomePage({super.key});
 
   @override
-  State<Home> createState() => _HomeState();
+  State<HomePage> createState() => _HomePageState();
 }
 
-class _HomeState extends State<Home> {
-  int tab = 0;
-  final saved = <String>[];
+class _HomePageState extends State<HomePage> {
+  final promptController = TextEditingController();
+  bool loading = false;
+  String result = '';
+  String duration = '5';
+  String ratio = '16:9';
 
-  void save(String value) {
-    setState(() => saved.insert(0, value));
-  }
+  Future<void> generateVideo() async {
+    final prompt = promptController.text.trim();
 
-  @override
-  Widget build(BuildContext context) {
-    final pages = [
-      const ChatPage(),
-      VideoPage(onSave: save),
-      ImagePage(onSave: save),
-      HistoryPage(items: saved),
-      const SettingsPage(),
-    ];
-
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          centerTitle: true,
-          title: const Text(
-            '✨ MERO AI',
-            style: TextStyle(color: gold, fontWeight: FontWeight.bold),
-          ),
-        ),
-        body: IndexedStack(index: tab, children: pages),
-        bottomNavigationBar: NavigationBar(
-          backgroundColor: panel,
-          selectedIndex: tab,
-          indicatorColor: gold.withOpacity(.15),
-          onDestinationSelected: (i) => setState(() => tab = i),
-          destinations: const [
-            NavigationDestination(icon: Icon(Icons.chat), label: 'محادثة'),
-            NavigationDestination(icon: Icon(Icons.movie), label: 'فيديو'),
-            NavigationDestination(icon: Icon(Icons.image), label: 'صور'),
-            NavigationDestination(icon: Icon(Icons.folder), label: 'أعمالي'),
-            NavigationDestination(icon: Icon(Icons.settings), label: 'إعدادات'),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// CHAT
-
-class ChatPage extends StatefulWidget {
-  const ChatPage({super.key});
-
-  @override
-  State<ChatPage> createState() => _ChatPageState();
-}
-
-class _ChatPageState extends State<ChatPage> {
-  final input = TextEditingController();
-  final messages = <String>[
-    'أهلًا بك في MERO AI ✨\nاكتب فكرتك أو اسألني أي شيء.',
-  ];
-
-  void send() {
-    final text = input.text.trim();
-    if (text.isEmpty) return;
+    if (prompt.isEmpty) {
+      setState(() => result = 'اكتب وصف الفيديو أولاً');
+      return;
+    }
 
     setState(() {
-      messages.add('👤 $text');
-      input.clear();
-      messages.add(
-        '🤖 وصلت فكرتك!\nهذه نسخة تجريبية. '
-        'لإجابات الذكاء الاصطناعي الحقيقية نحتاج ربط نموذج AI بخادم آمن.',
-      );
+      loading = true;
+      result = 'جاري إرسال طلب الفيديو... انتظر';
     });
-  }
 
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Expanded(
-          child: ListView.builder(
-            padding: const EdgeInsets.all(16),
-            itemCount: messages.length,
-            itemBuilder: (_, i) => Card(
-              color: panel,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(messages[i]),
-              ),
-            ),
-          ),
-        ),
-        SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.all(10),
-            child: Row(
-              children: [
-                Expanded(
-                  child: TextField(
-                    controller: input,
-                    minLines: 1,
-                    maxLines: 4,
-                    decoration: const InputDecoration(
-                      hintText: 'اكتب رسالتك...',
-                      filled: true,
-                    ),
-                    onSubmitted: (_) => send(),
-                  ),
-                ),
-                IconButton(
-                  onPressed: send,
-                  icon: const Icon(Icons.send),
-                  color: gold,
-                ),
-              ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-// VIDEO GENERATOR
-
-class VideoPage extends StatefulWidget {
-  final ValueChanged<String> onSave;
-  const VideoPage({super.key, required this.onSave});
-
-  @override
-  State<VideoPage> createState() => _VideoPageState();
-}
-
-class _VideoPageState extends State<VideoPage> {
-  final prompt = TextEditingController();
-  String style = 'سينمائي';
-  String ratio = '16:9';
-  String duration = '5 ثوانٍ';
-
-  Widget choices(List<String> options, String value,
-      ValueChanged<String> onChange) {
-    return Wrap(
-      spacing: 8,
-      children: options.map((s) {
-        return ChoiceChip(
-          label: Text(s),
-          selected: value == s,
-          selectedColor: gold.withOpacity(.25),
-          onSelected: (_) => onChange(s),
-        );
-      }).toList(),
-    );
-  }
-
-  void create() {
-    if (prompt.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('اكتب وصف الفيديو أولاً')),
+    try {
+      final response = await Supabase.instance.client.functions.invoke(
+        'mero-video',
+        body: {
+          'prompt': prompt,
+          'duration': duration,
+          'aspect_ratio': ratio,
+        },
       );
-      return;
+
+      final data = response.data;
+
+      setState(() {
+        result = 'تم إرسال الطلب.\n\nالنتيجة:\n$data';
+      });
+    } catch (e) {
+      setState(() {
+        result = 'حدث خطأ أثناء إنشاء الفيديو:\n$e';
+      });
+    } finally {
+      setState(() => loading = false);
     }
-
-    widget.onSave('فيديو: ${prompt.text.trim()}');
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('تم حفظ الوصف. التوليد الحقيقي يحتاج ربط خدمة AI.'),
-      ),
-    );
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Heading('🎬 إنشاء فيديو بالذكاء الاصطناعي'),
-        Container(
-          height: 160,
-          decoration: BoxDecoration(
-            color: panel,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: const Center(
-            child: Icon(Icons.video_camera_back, size: 65, color: gold),
-          ),
-        ),
-        const Heading('وصف الفيديو'),
-        TextField(
-          controller: prompt,
-          minLines: 4,
-          maxLines: 6,
-          decoration: const InputDecoration(
-            hintText: 'صف الفيديو الذي تريد إنشاءه بالتفصيل...',
-          ),
-        ),
-        const Heading('النمط'),
-        choices(['سينمائي', 'واقعي', 'أنمي', 'كرتوني', 'إعلاني', 'خيال'],
-            style, (v) => setState(() => style = v)),
-        const Heading('الأبعاد'),
-        choices(['16:9', '9:16', '1:1'], ratio,
-            (v) => setState(() => ratio = v)),
-        const Heading('المدة'),
-        choices(['5 ثوانٍ', '10 ثوانٍ', '15 ثوانٍ'], duration,
-            (v) => setState(() => duration = v)),
-        const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: create,
-          icon: const Icon(Icons.auto_awesome),
-          label: const Text('إنشاء الفيديو'),
-          style: FilledButton.styleFrom(
-            backgroundColor: gold,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.all(16),
-          ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'التوليد الفعلي يحتاج ربط مزود فيديو.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white38),
-        ),
-      ],
-    );
-  }
-}
-
-// IMAGE GENERATOR
-
-class ImagePage extends StatefulWidget {
-  final ValueChanged<String> onSave;
-  const ImagePage({super.key, required this.onSave});
-
-  @override
-  State<ImagePage> createState() => _ImagePageState();
-}
-
-class _ImagePageState extends State<ImagePage> {
-  final prompt = TextEditingController();
-  String style = 'واقعي';
-
-  void generate() {
-    if (prompt.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('اكتب وصف الصورة')),
-      );
-      return;
-    }
-
-    widget.onSave('صورة: ${prompt.text.trim()}');
-
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تم حفظ الوصف محليًا.')),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Heading('🎨 صانع الصور AI'),
-        Container(
-          height: 180,
-          decoration: BoxDecoration(
-            color: panel,
-            borderRadius: BorderRadius.circular(18),
-          ),
-          child: const Center(
-            child: Icon(Icons.image, size: 65, color: gold),
-          ),
-        ),
-        const Heading('وصف الصورة'),
-        TextField(
-          controller: prompt,
-          minLines: 3,
-          maxLines: 5,
-          decoration: const InputDecoration(
-            hintText: 'صف الصورة التي تريد إنشائها...',
-          ),
-        ),
-        const Heading('الأسلوب'),
-        Wrap(
-          spacing: 8,
-          children: ['واقعي', 'أنمي', 'رسم', '3D', 'فن رقمي']
-              .map((s) => ChoiceChip(
-                    label: Text(s),
-                    selected: style == s,
-                    selectedColor: gold.withOpacity(.2),
-                    onSelected: (_) => setState(() => style = s),
-                  ))
-              .toList(),
-        ),
-        const SizedBox(height: 20),
-        FilledButton.icon(
-          onPressed: generate,
-          icon: const Icon(Icons.palette),
-          label: const Text('إنشاء صورة'),
-          style: FilledButton.styleFrom(
-            backgroundColor: gold,
-            foregroundColor: Colors.black,
-            padding: const EdgeInsets.all(15),
-          ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'إنشاء الصور الفعلي يحتاج ربط خدمة.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white38),
-        ),
-      ],
-    );
-  }
-}
-
-// HISTORY
-
-class HistoryPage extends StatelessWidget {
-  final List<String> items;
-  const HistoryPage({super.key, required this.items});
-
-  @override
-  Widget build(BuildContext context) {
-    if (items.isEmpty) {
-      return const Center(
-        child: Text('لا توجد أعمال محفوظة حتى الآن'),
-      );
-    }
-
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Heading('📁 أعمالي'),
-        ...items.map((s) => Card(
-              color: panel,
-              child: ListTile(
-                leading: const Icon(Icons.description, color: gold),
-                title: Text(s),
-              ),
-            )),
-      ],
-    );
-  }
-}
-
-// SETTINGS
-
-class SettingsPage extends StatelessWidget {
-  const SettingsPage({super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Heading('⚙️ الإعدادات'),
-        const Card(
-          color: panel,
-          child: ListTile(
-            leading: CircleAvatar(
-              backgroundColor: gold,
-              child: Icon(Icons.person, color: Colors.black),
-            ),
-            title: Text('MERO AI'),
-            subtitle: Text('مساعدك الإبداعي'),
-          ),
-        ),
-        const ListTile(
-          leading: Icon(Icons.language, color: gold),
-          title: Text('اللغة'),
-          subtitle: Text('العربية'),
-        ),
-        const ListTile(
-          leading: Icon(Icons.palette, color: gold),
-          title: Text('المظهر'),
-          subtitle: Text('أسود وذهبي'),
-        ),
-        const ListTile(
-          leading: Icon(Icons.info, color: gold),
-          title: Text('حول التطبيق'),
-          subtitle: Text('MERO AI - النسخة التجريبية'),
-        ),
-        const ListTile(
-          leading: Icon(Icons.shield, color: gold),
-          title: Text('الخصوصية'),
-          subtitle: Text('لا تشارك بيانات حساسة'),
-        ),
-        const Text(
-          'خدمات الذكاء الاصطناعي تحتاج إعداد خادم وربط API.',
-          style: TextStyle(color: Colors.white54),
-        ),
-      ],
-    );
-  }
-}
-
-// SECTION TITLE
-
-class Heading extends StatelessWidget {
-  final String text;
-  const Heading(this.text, {super.key});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 14),
+  Widget sectionTitle(String text) {
+    return Align(
+      alignment: Alignment.centerRight,
       child: Text(
         text,
         style: const TextStyle(
           color: gold,
+          fontSize: 17,
           fontWeight: FontWeight.bold,
-          fontSize: 18,
         ),
+      ),
+    );
+  }
+
+  Widget optionButton(
+    String value,
+    String current,
+    Function(String) onSelect,
+  ) {
+    final selected = value == current;
+
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => onSelect(value),
+        child: Container(
+          margin: const EdgeInsets.all(4),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: selected ? gold : panel,
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: Center(
+            child: Text(
+              value,
+              style: TextStyle(
+                color: selected ? Colors.black : Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: bg,
+        centerTitle: true,
+        title: const Text(
+          'MERO AI',
+          style: TextStyle(
+            color: gold,
+            fontWeight: FontWeight.bold,
+            letterSpacing: 2,
+          ),
+        ),
+      ),
+      body: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: panel,
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: gold.withOpacity(0.35)),
+            ),
+            child: const Column(
+              children: [
+                Icon(Icons.movie_creation_outlined, color: gold, size: 48),
+                SizedBox(height: 10),
+                Text(
+                  'مولّد الفيديو بالذكاء الاصطناعي',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: gold,
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                SizedBox(height: 8),
+                Text(
+                  'اكتب فكرتك وحوّلها إلى فيديو',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          sectionTitle('وصف الفيديو'),
+          const SizedBox(height: 10),
+          TextField(
+            controller: promptController,
+            minLines: 4,
+            maxLines: 7,
+            textAlign: TextAlign.right,
+            decoration: InputDecoration(
+              hintText: 'صف الفيديو الذي تريد إنشاءه بالتفصيل...',
+              filled: true,
+              fillColor: panel,
+              border: OutlineInputBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          sectionTitle('مدة الفيديو'),
+          Row(
+            children: [
+              optionButton('5', duration, (v) => setState(() => duration = v)),
+              optionButton('10', duration, (v) => setState(() => duration = v)),
+              optionButton('15', duration, (v) => setState(() => duration = v)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          sectionTitle('أبعاد الفيديو'),
+          Row(
+            children: [
+              optionButton('16:9', ratio, (v) => setState(() => ratio = v)),
+              optionButton('9:16', ratio, (v) => setState(() => ratio = v)),
+              optionButton('1:1', ratio, (v) => setState(() => ratio = v)),
+            ],
+          ),
+          const SizedBox(height: 24),
+          SizedBox(
+            height: 55,
+            child: ElevatedButton(
+              onPressed: loading ? null : generateVideo,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: gold,
+                foregroundColor: Colors.black,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(15),
+                ),
+              ),
+              child: loading
+                  ? const CircularProgressIndicator(color: Colors.black)
+                  : const Text(
+                      'إنشاء الفيديو',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          if (result.isNotEmpty)
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: panel,
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: SelectableText(
+                result,
+                textAlign: TextAlign.right,
+                style: const TextStyle(color: Colors.white),
+              ),
+            ),
+          const SizedBox(height: 30),
+          sectionTitle('مساعد MERO'),
+          const SizedBox(height: 10),
+          const Text(
+            'واجهة المساعد جاهزة لإضافة ربط نموذج الذكاء الاصطناعي للمحادثة.',
+            textAlign: TextAlign.right,
+            style: TextStyle(color: Colors.white70),
+          ),
+        ],
       ),
     );
   }
