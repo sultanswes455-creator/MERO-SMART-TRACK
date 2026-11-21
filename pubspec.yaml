@@ -1,7 +1,7 @@
 name: snak_cheats
-description: SNAK CHEATS training app
+description: SNAK floating training assistant
 publish_to: 'none'
-version: 1.0.0+1
+version: 1.0.0+2
 
 environment:
   sdk: '>=3.3.0 <4.0.0'
@@ -9,6 +9,7 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_overlay_window: ^1.0.2
 
 dev_dependencies:
   flutter_test:
