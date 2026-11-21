@@ -1,5 +1,5 @@
 
-name: Build Android APK
+name: Build SNAK CHEATS APK
 
 on:
   workflow_dispatch:
@@ -8,6 +8,7 @@ on:
       - 'pubspec.yaml'
       - 'lib/**'
       - '.github/workflows/build-apk.yml'
+      - 'tool/**'
 
 jobs:
   build:
@@ -19,14 +20,16 @@ jobs:
         with:
           channel: stable
 
-      - name: Generate Android project files
-        run: flutter create --platforms=android --project-name royal_jackpot .
+      - name: Generate Android project
+        run: flutter create --platforms=android --project-name snak_cheats .
 
-      - run: flutter pub get
+      - name: Get dependencies
+        run: flutter pub get
 
-      - run: flutter build apk --release
+      - name: Build APK
+        run: flutter build apk --release
 
       - uses: actions/upload-artifact@v4
         with:
-          name: royal-jackpot-apk
+          name: snak-cheats-apk
           path: build/app/outputs/flutter-apk/app-release.apk
