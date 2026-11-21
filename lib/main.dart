@@ -354,8 +354,7 @@ class _TrainingOverlayState extends State<TrainingOverlay> {
                   painter: AimPainter(angle, power, spin),
                 ),
                 const Text(
-                  'مؤشر 
-  —  يتتبع كرات اللعبة تلقائياً',
+                  'مؤشر تدريبي يدوي — لا يتتبع كرات اللعبة تلقائياً',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     color: Colors.white70,
