@@ -9,7 +9,8 @@ environment:
 
 dependencies:
   flutter:
-   supabase_flutter: ^2.10.0 sdk: flutter
+    sdk: flutter
+  supabase_flutter: ^2.10.0
 
 dev_dependencies:
   flutter_test:
