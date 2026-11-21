@@ -1,863 +1,453 @@
 
-import 'dart:math';
 import 'package:flutter/material.dart';
 
-void main() => runApp(const MeroPlay());
+void main() => runApp(const MeroAI());
 
 const gold = Color(0xFFFFC400);
-const bg = Color(0xFF101113);
-const panel = Color(0xFF222326);
+const bg = Color(0xFF0B0C0F);
+const panel = Color(0xFF191A1E);
 
-class MeroPlay extends StatelessWidget {
-  const MeroPlay({super.key});
+class MeroAI extends StatelessWidget {
+  const MeroAI({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      title: 'MERO AI',
       debugShowCheckedModeBanner: false,
-      title: 'MERO PLAY',
-      theme: ThemeData.dark().copyWith(
+      theme: ThemeData(
+        brightness: Brightness.dark,
         scaffoldBackgroundColor: bg,
         colorScheme: const ColorScheme.dark(primary: gold),
+        appBarTheme: const AppBarTheme(backgroundColor: bg),
       ),
-      home: const MainPage(),
+      home: const Home(),
     );
   }
 }
 
-class WalletRequest {
-  WalletRequest(this.type, this.amount);
-  final String type;
-  final double amount;
-  bool processed = false;
-  bool accepted = false;
-}
-
-class MainPage extends StatefulWidget {
-  const MainPage({super.key});
+class Home extends StatefulWidget {
+  const Home({super.key});
 
   @override
-  State<MainPage> createState() => _MainPageState();
+  State<Home> createState() => _HomeState();
 }
 
-class _MainPageState extends State<MainPage> {
+class _HomeState extends State<Home> {
   int tab = 0;
-  double points = 500;
-  final requests = <WalletRequest>[];
+  final saved = <String>[];
 
-  void sendRequest(String type, double amount) {
-    setState(() => requests.add(WalletRequest(type, amount)));
-  }
-
-  void accept(WalletRequest r) {
-    if (r.processed) return;
-
-    setState(() {
-      if (r.type == 'إزالة نقاط' && r.amount > points) {
-        r.processed = true;
-        r.accepted = false;
-        return;
-      }
-
-      r.processed = true;
-      r.accepted = true;
-
-      if (r.type == 'إضافة نقاط') {
-        points += r.amount;
-      } else {
-        points -= r.amount;
-      }
-    });
-  }
-
-  void reject(WalletRequest r) {
-    if (r.processed) return;
-    setState(() {
-      r.processed = true;
-      r.accepted = false;
-    });
+  void save(String value) {
+    setState(() => saved.insert(0, value));
   }
 
   @override
   Widget build(BuildContext context) {
     final pages = [
-      HomePage(
-        points: points,
-        goWallet: () => setState(() => tab = 3),
-        goGames: () => setState(() => tab = 2),
-      ),
-      const SportsPage(),
-      const GamesPage(),
-      WalletPage(points: points, requests: requests, onSend: sendRequest),
-      AdminPage(requests: requests, onAccept: accept, onReject: reject),
+      const ChatPage(),
+      VideoPage(onSave: save),
+      ImagePage(onSave: save),
+      HistoryPage(items: saved),
+      const SettingsPage(),
     ];
 
-    return Scaffold(
-      appBar: AppBar(
-        centerTitle: true,
-        title: const Text(
-          'MERO PLAY',
-          style: TextStyle(color: gold, fontWeight: FontWeight.bold),
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        appBar: AppBar(
+          centerTitle: true,
+          title: const Text(
+            '✨ MERO AI',
+            style: TextStyle(color: gold, fontWeight: FontWeight.bold),
+          ),
         ),
-      ),
-      body: IndexedStack(
-        index: tab,
-        children: pages,
-      ),
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: panel,
-        selectedIndex: tab,
-        indicatorColor: gold.withOpacity(.2),
-        onDestinationSelected: (i) => setState(() => tab = i),
-        destinations: const [
-          NavigationDestination(icon: Icon(Icons.home), label: 'الرئيسية'),
-          NavigationDestination(
-              icon: Icon(Icons.sports_soccer), label: 'رياضة'),
-          NavigationDestination(icon: Icon(Icons.games), label: 'الألعاب'),
-          NavigationDestination(icon: Icon(Icons.wallet), label: 'المحفظة'),
-          NavigationDestination(
-              icon: Icon(Icons.admin_panel_settings), label: 'إدارة'),
-        ],
+        body: IndexedStack(index: tab, children: pages),
+        bottomNavigationBar: NavigationBar(
+          backgroundColor: panel,
+          selectedIndex: tab,
+          indicatorColor: gold.withOpacity(.15),
+          onDestinationSelected: (i) => setState(() => tab = i),
+          destinations: const [
+            NavigationDestination(icon: Icon(Icons.chat), label: 'محادثة'),
+            NavigationDestination(icon: Icon(Icons.movie), label: 'فيديو'),
+            NavigationDestination(icon: Icon(Icons.image), label: 'صور'),
+            NavigationDestination(icon: Icon(Icons.folder), label: 'أعمالي'),
+            NavigationDestination(icon: Icon(Icons.settings), label: 'إعدادات'),
+          ],
+        ),
       ),
     );
   }
 }
 
-// الرئيسية
-class HomePage extends StatelessWidget {
-  const HomePage({
-    super.key,
-    required this.points,
-    required this.goWallet,
-    required this.goGames,
-  });
+// CHAT
 
-  final double points;
-  final VoidCallback goWallet, goGames;
+class ChatPage extends StatefulWidget {
+  const ChatPage({super.key});
+
+  @override
+  State<ChatPage> createState() => _ChatPageState();
+}
+
+class _ChatPageState extends State<ChatPage> {
+  final input = TextEditingController();
+  final messages = <String>[
+    'أهلًا بك في MERO AI ✨\nاكتب فكرتك أو اسألني أي شيء.',
+  ];
+
+  void send() {
+    final text = input.text.trim();
+    if (text.isEmpty) return;
+
+    setState(() {
+      messages.add('👤 $text');
+      input.clear();
+      messages.add(
+        '🤖 وصلت فكرتك!\nهذه نسخة تجريبية. '
+        'لإجابات الذكاء الاصطناعي الحقيقية نحتاج ربط نموذج AI بخادم آمن.',
+      );
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
+    return Column(
       children: [
-        Container(
-          height: 150,
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF604900), bg],
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(16),
+            itemCount: messages.length,
+            itemBuilder: (_, i) => Card(
+              color: panel,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(messages[i]),
+              ),
             ),
           ),
-          child: const Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
+        ),
+        SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(10),
+            child: Row(
               children: [
-                Icon(Icons.stars, color: gold, size: 45),
-                Text(
-                  'MERO PLAY',
-                  style: TextStyle(
-                    color: gold,
-                    fontSize: 27,
-                    fontWeight: FontWeight.bold,
+                Expanded(
+                  child: TextField(
+                    controller: input,
+                    minLines: 1,
+                    maxLines: 4,
+                    decoration: const InputDecoration(
+                      hintText: 'اكتب رسالتك...',
+                      filled: true,
+                    ),
+                    onSubmitted: (_) => send(),
                   ),
                 ),
-                Text('ألعاب ترفيهية • نقاط افتراضية'),
+                IconButton(
+                  onPressed: send,
+                  icon: const Icon(Icons.send),
+                  color: gold,
+                ),
               ],
             ),
           ),
-        ),
-        const SizedBox(height: 12),
-        Box(
-          child: Column(
-            children: [
-              const Text('رصيدك التجريبي'),
-              Text(
-                '${points.toStringAsFixed(2)} نقطة',
-                style: const TextStyle(
-                  color: gold,
-                  fontSize: 27,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              FilledButton(
-                onPressed: goWallet,
-                child: const Text('المحفظة'),
-              ),
-            ],
-          ),
-        ),
-        const Heading('الألعاب المميزة'),
-        GameTile(
-          'Sky Run',
-          'لعبة طيران',
-          Icons.flight,
-          () => openGame(context, const SkyGame()),
-        ),
-        GameTile(
-          'Kamikaze Grid',
-          'لعبة الخانات والمراحل',
-          Icons.grid_4x4,
-          () => openGame(context, const GridGame()),
-        ),
-        GameTile(
-          'Mines Puzzle',
-          'تحدي شبكة',
-          Icons.warning_amber_rounded,
-          () => openGame(context, const MinesGame()),
-        ),
-        GameTile(
-          'Lucky Wheel',
-          'عجلة عشوائية',
-          Icons.casino,
-          () => openGame(context, const WheelGame()),
-        ),
-        GameTile(
-          'High / Low',
-          'توقع البطاقات',
-          Icons.style,
-          () => openGame(context, const HighLowGame()),
-        ),
-        FilledButton(
-          onPressed: goGames,
-          child: const Text('عرض جميع الألعاب'),
         ),
       ],
     );
   }
 }
 
-void openGame(BuildContext c, Widget game) {
-  Navigator.push(c, MaterialPageRoute(builder: (_) => game));
-}
+// VIDEO GENERATOR
 
-// الألعاب
-class GamesPage extends StatelessWidget {
-  const GamesPage({super.key});
+class VideoPage extends StatefulWidget {
+  final ValueChanged<String> onSave;
+  const VideoPage({super.key, required this.onSave});
 
   @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Heading('الألعاب'),
-          GameTile(
-            'Sky Run',
-            'تحدي طيران',
-            Icons.flight,
-            () => openGame(context, const SkyGame()),
-          ),
-          GameTile(
-            'Kamikaze Grid',
-            'مراحل وخانات',
-            Icons.grid_4x4,
-            () => openGame(context, const GridGame()),
-          ),
-          GameTile(
-            'Mines Puzzle',
-            'لوحة 5 × 5',
-            Icons.warning_amber_rounded,
-            () => openGame(context, const MinesGame()),
-          ),
-          GameTile(
-            'Lucky Wheel',
-            'عجلة',
-            Icons.casino,
-            () => openGame(context, const WheelGame()),
-          ),
-          GameTile(
-            'High / Low',
-            'بطاقات',
-            Icons.style,
-            () => openGame(context, const HighLowGame()),
-          ),
-        ],
+  State<VideoPage> createState() => _VideoPageState();
+}
+
+class _VideoPageState extends State<VideoPage> {
+  final prompt = TextEditingController();
+  String style = 'سينمائي';
+  String ratio = '16:9';
+  String duration = '5 ثوانٍ';
+
+  Widget choices(List<String> options, String value,
+      ValueChanged<String> onChange) {
+    return Wrap(
+      spacing: 8,
+      children: options.map((s) {
+        return ChoiceChip(
+          label: Text(s),
+          selected: value == s,
+          selectedColor: gold.withOpacity(.25),
+          onSelected: (_) => onChange(s),
+        );
+      }).toList(),
+    );
+  }
+
+  void create() {
+    if (prompt.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اكتب وصف الفيديو أولاً')),
       );
-}
+      return;
+    }
 
-// توقع رياضي ترفيهي
-class SportsPage extends StatefulWidget {
-  const SportsPage({super.key});
+    widget.onSave('فيديو: ${prompt.text.trim()}');
 
-  @override
-  State<SportsPage> createState() => _SportsPageState();
-}
-
-class _SportsPageState extends State<SportsPage> {
-  int? choice;
-  bool saved = false;
-
-  @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Heading('توقع رياضي ترفيهي'),
-          const Box(
-            child: Text(
-              'مباراة افتراضية\nالفريق A  ×  الفريق B',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 20),
-            ),
-          ),
-          const Text('اختر توقعًا:'),
-          ...['فوز الفريق A', 'تعادل', 'فوز الفريق B']
-              .asMap()
-              .entries
-              .map(
-                (e) => RadioListTile<int>(
-                  value: e.key,
-                  groupValue: choice,
-                  onChanged: saved ? null : (v) => setState(() => choice = v),
-                  title: Text(e.value),
-                ),
-              ),
-          FilledButton(
-            onPressed: choice == null || saved
-                ? null
-                : () => setState(() => saved = true),
-            child: const Text('حفظ التوقع'),
-          ),
-          if (saved)
-            const Box(child: Text('تم حفظ توقعك الترفيهي.')),
-        ],
-      );
-}
-
-// المحفظة التجريبية
-class WalletPage extends StatelessWidget {
-  const WalletPage({
-    super.key,
-    required this.points,
-    required this.requests,
-    required this.onSend,
-  });
-
-  final double points;
-  final List<WalletRequest> requests;
-  final void Function(String, double) onSend;
-
-  Future<void> showRequest(BuildContext context, String type) async {
-    final controller = TextEditingController();
-
-    await showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: panel,
-        title: Text(type, textAlign: TextAlign.center),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Text('نقاط تجريبية فقط'),
-            TextField(
-              controller: controller,
-              keyboardType:
-                  const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'الكمية',
-                suffixText: 'نقاط',
-              ),
-            ),
-            const Text('من 10 إلى 200 نقطة'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('إلغاء'),
-          ),
-          FilledButton(
-            onPressed: () {
-              final value = double.tryParse(controller.text);
-
-              if (value == null ||
-                  !value.isFinite ||
-                  value < 10 ||
-                  value > 200 ||
-                  (type == 'إزالة نقاط' && value > points)) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('الكمية غير صالحة')),
-                );
-                return;
-              }
-
-              onSend(type, value);
-              Navigator.pop(ctx);
-            },
-            child: const Text('تأكيد'),
-          ),
-        ],
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('تم حفظ الوصف. التوليد الحقيقي يحتاج ربط خدمة AI.'),
       ),
     );
-
-    controller.dispose();
   }
 
   @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          Box(
-            child: Column(
-              children: [
-                const Text('رصيد نقاط تجريبي'),
-                Text(
-                  '${points.toStringAsFixed(2)} نقطة',
-                  style: const TextStyle(
-                    color: gold,
-                    fontSize: 30,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const Text('غير قابل للتحويل إلى أموال'),
-              ],
-            ),
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Heading('🎬 إنشاء فيديو بالذكاء الاصطناعي'),
+        Container(
+          height: 160,
+          decoration: BoxDecoration(
+            color: panel,
+            borderRadius: BorderRadius.circular(18),
           ),
-          Row(
-            children: [
-              Expanded(
-                child: FilledButton(
-                  onPressed: () => showRequest(context, 'إضافة نقاط'),
-                  child: const Text('إضافة نقاط'),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: OutlinedButton(
-                  onPressed: () => showRequest(context, 'إزالة نقاط'),
-                  child: const Text('إزالة نقاط'),
-                ),
-              ),
-            ],
+          child: const Center(
+            child: Icon(Icons.video_camera_back, size: 65, color: gold),
           ),
-          const Heading('طلبات المحفظة'),
-          if (requests.isEmpty) const Text('لا توجد طلبات'),
-          ...requests.reversed.map(
-            (r) => ListTile(
-              title: Text('${r.type} • ${r.amount}'),
-              subtitle: Text(
-                r.processed
-                    ? (r.accepted ? 'مقبول' : 'مرفوض')
-                    : 'قيد المراجعة',
-              ),
-              leading: Icon(
-                Icons.circle,
-                color: r.processed
-                    ? (r.accepted ? Colors.green : Colors.red)
-                    : gold,
-              ),
-            ),
+        ),
+        const Heading('وصف الفيديو'),
+        TextField(
+          controller: prompt,
+          minLines: 4,
+          maxLines: 6,
+          decoration: const InputDecoration(
+            hintText: 'صف الفيديو الذي تريد إنشاءه بالتفصيل...',
           ),
-        ],
+        ),
+        const Heading('النمط'),
+        choices(['سينمائي', 'واقعي', 'أنمي', 'كرتوني', 'إعلاني', 'خيال'],
+            style, (v) => setState(() => style = v)),
+        const Heading('الأبعاد'),
+        choices(['16:9', '9:16', '1:1'], ratio,
+            (v) => setState(() => ratio = v)),
+        const Heading('المدة'),
+        choices(['5 ثوانٍ', '10 ثوانٍ', '15 ثوانٍ'], duration,
+            (v) => setState(() => duration = v)),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          onPressed: create,
+          icon: const Icon(Icons.auto_awesome),
+          label: const Text('إنشاء الفيديو'),
+          style: FilledButton.styleFrom(
+            backgroundColor: gold,
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.all(16),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'التوليد الفعلي يحتاج ربط مزود فيديو.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white38),
+        ),
+      ],
+    );
+  }
+}
+
+// IMAGE GENERATOR
+
+class ImagePage extends StatefulWidget {
+  final ValueChanged<String> onSave;
+  const ImagePage({super.key, required this.onSave});
+
+  @override
+  State<ImagePage> createState() => _ImagePageState();
+}
+
+class _ImagePageState extends State<ImagePage> {
+  final prompt = TextEditingController();
+  String style = 'واقعي';
+
+  void generate() {
+    if (prompt.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('اكتب وصف الصورة')),
       );
-}
+      return;
+    }
 
-// لوحة إدارة الطلبات
-class AdminPage extends StatelessWidget {
-  const AdminPage({
-    super.key,
-    required this.requests,
-    required this.onAccept,
-    required this.onReject,
-  });
+    widget.onSave('صورة: ${prompt.text.trim()}');
 
-  final List<WalletRequest> requests;
-  final void Function(WalletRequest) onAccept, onReject;
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('تم حفظ الوصف محليًا.')),
+    );
+  }
 
   @override
-  Widget build(BuildContext context) => ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          const Heading('لوحة الإدارة التجريبية'),
-          const Text('هذه لوحة محلية تجريبية وليست محمية'),
-          if (requests.where((r) => !r.processed).isEmpty)
-            const Box(child: Text('لا توجد طلبات معلقة')),
-          ...requests.where((r) => !r.processed).map(
-            (r) => Box(
-              child: Column(
-                children: [
-                  Text(r.type),
-                  Text('${r.amount} نقطة'),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: FilledButton(
-                          onPressed: () => onAccept(r),
-                          child: const Text('قبول'),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: OutlinedButton(
-                          onPressed: () => onReject(r),
-                          child: const Text('رفض'),
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Heading('🎨 صانع الصور AI'),
+        Container(
+          height: 180,
+          decoration: BoxDecoration(
+            color: panel,
+            borderRadius: BorderRadius.circular(18),
           ),
-        ],
+          child: const Center(
+            child: Icon(Icons.image, size: 65, color: gold),
+          ),
+        ),
+        const Heading('وصف الصورة'),
+        TextField(
+          controller: prompt,
+          minLines: 3,
+          maxLines: 5,
+          decoration: const InputDecoration(
+            hintText: 'صف الصورة التي تريد إنشائها...',
+          ),
+        ),
+        const Heading('الأسلوب'),
+        Wrap(
+          spacing: 8,
+          children: ['واقعي', 'أنمي', 'رسم', '3D', 'فن رقمي']
+              .map((s) => ChoiceChip(
+                    label: Text(s),
+                    selected: style == s,
+                    selectedColor: gold.withOpacity(.2),
+                    onSelected: (_) => setState(() => style = s),
+                  ))
+              .toList(),
+        ),
+        const SizedBox(height: 20),
+        FilledButton.icon(
+          onPressed: generate,
+          icon: const Icon(Icons.palette),
+          label: const Text('إنشاء صورة'),
+          style: FilledButton.styleFrom(
+            backgroundColor: gold,
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.all(15),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text(
+          'إنشاء الصور الفعلي يحتاج ربط خدمة.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white38),
+        ),
+      ],
+    );
+  }
+}
+
+// HISTORY
+
+class HistoryPage extends StatelessWidget {
+  final List<String> items;
+  const HistoryPage({super.key, required this.items});
+
+  @override
+  Widget build(BuildContext context) {
+    if (items.isEmpty) {
+      return const Center(
+        child: Text('لا توجد أعمال محفوظة حتى الآن'),
       );
-}
+    }
 
-// لعبة Sky Run
-class SkyGame extends StatefulWidget {
-  const SkyGame({super.key});
-
-  @override
-  State<SkyGame> createState() => _SkyGameState();
-}
-
-class _SkyGameState extends State<SkyGame> {
-  int score = 0;
-  bool running = false;
-
-  @override
-  Widget build(BuildContext context) => GameScreen('Sky Run', [
-        const Icon(Icons.flight, color: gold, size: 85),
-        Text(
-          'النقاط: $score',
-          style: const TextStyle(color: gold, fontSize: 30),
-        ),
-        Text(running ? 'الجولة بدأت' : 'ابدأ اللعب'),
-        FilledButton(
-          onPressed: () => setState(() => running = !running),
-          child: Text(running ? 'إيقاف' : 'ابدأ'),
-        ),
-        if (running)
-          FilledButton(
-            onPressed: () => setState(() => score += Random().nextInt(10) + 1),
-            child: const Text('اجمع نقاط'),
-          ),
-        TextButton(
-          onPressed: () => setState(() {
-            score = 0;
-            running = false;
-          }),
-          child: const Text('إعادة'),
-        ),
-      ]);
-}
-
-// لعبة Kamikaze Grid
-class GridGame extends StatefulWidget {
-  const GridGame({super.key});
-
-  @override
-  State<GridGame> createState() => _GridGameState();
-}
-
-class _GridGameState extends State<GridGame> {
-  final safe = <int>{};
-  final opened = <int>{};
-  int level = 1, score = 0;
-  bool lost = false;
-
-  void resetBoard() {
-    final cells = List.generate(25, (i) => i)..shuffle();
-    safe
-      ..clear()
-      ..addAll(cells.take(18));
-    opened.clear();
-    lost = false;
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Heading('📁 أعمالي'),
+        ...items.map((s) => Card(
+              color: panel,
+              child: ListTile(
+                leading: const Icon(Icons.description, color: gold),
+                title: Text(s),
+              ),
+            )),
+      ],
+    );
   }
-
-  @override
-  void initState() {
-    super.initState();
-    resetBoard();
-  }
-
-  @override
-  Widget build(BuildContext context) => GameScreen('Kamikaze Grid', [
-        Text(
-          'المستوى $level • النقاط $score',
-          style: const TextStyle(color: gold),
-        ),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: 25,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            crossAxisSpacing: 5,
-            mainAxisSpacing: 5,
-          ),
-          itemBuilder: (context, i) => InkWell(
-            onTap: lost || opened.contains(i)
-                ? null
-                : () => setState(() {
-                      opened.add(i);
-                      if (safe.contains(i)) {
-                        score += 5 * level;
-                        if (opened.length >= 5) {
-                          level++;
-                          resetBoard();
-                        }
-                      } else {
-                        lost = true;
-                      }
-                    }),
-            child: Container(
-              decoration: BoxDecoration(
-                color: opened.contains(i)
-                    ? (safe.contains(i) ? Colors.green : Colors.red)
-                    : panel,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                opened.contains(i)
-                    ? (safe.contains(i) ? Icons.star : Icons.close)
-                    : Icons.help_outline,
-                color: gold,
-              ),
-            ),
-          ),
-        ),
-        Text(lost ? 'انتهى المستوى' : 'اختر الخانات'),
-        FilledButton(
-          onPressed: () => setState(() {
-            level = 1;
-            score = 0;
-            resetBoard();
-          }),
-          child: const Text('إعادة اللعب'),
-        ),
-      ]);
 }
 
-// لعبة Mines Puzzle
-class MinesGame extends StatefulWidget {
-  const MinesGame({super.key});
+// SETTINGS
+
+class SettingsPage extends StatelessWidget {
+  const SettingsPage({super.key});
 
   @override
-  State<MinesGame> createState() => _MinesGameState();
-}
-
-class _MinesGameState extends State<MinesGame> {
-  final bombs = <int>{2, 7, 14, 18, 23};
-  final opened = <int>{};
-  int score = 0;
-  bool over = false;
-
-  void newGame() {
-    opened.clear();
-    score = 0;
-    over = false;
-  }
-
-  @override
-  Widget build(BuildContext context) => GameScreen('Mines Puzzle', [
-        Text('النقاط: $score', style: const TextStyle(color: gold)),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: 25,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 5,
-            crossAxisSpacing: 5,
-            mainAxisSpacing: 5,
-          ),
-          itemBuilder: (context, i) => InkWell(
-            onTap: over || opened.contains(i)
-                ? null
-                : () => setState(() {
-                      opened.add(i);
-                      if (bombs.contains(i)) {
-                        over = true;
-                      } else {
-                        score += 2;
-                      }
-                    }),
-            child: Container(
-              decoration: BoxDecoration(
-                color: opened.contains(i)
-                    ? (bombs.contains(i) ? Colors.red : Colors.green)
-                    : panel,
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child: Icon(
-                opened.contains(i)
-                    ? (bombs.contains(i)
-                        ? Icons.warning_amber_rounded
-                        : Icons.check)
-                    : Icons.question_mark,
-                color: gold,
-              ),
-            ),
-          ),
-        ),
-        Text(over ? 'انتهت الجولة' : 'افتح الخانات'),
-        FilledButton(
-          onPressed: () => setState(newGame),
-          child: const Text('لعبة جديدة'),
-        ),
-      ]);
-}
-
-// عجلة الحظ
-class WheelGame extends StatefulWidget {
-  const WheelGame({super.key});
-
-  @override
-  State<WheelGame> createState() => _WheelGameState();
-}
-
-class _WheelGameState extends State<WheelGame> {
-  String result = 'دور العجلة';
-  final options = [
-    '2 نقطة',
-    '5 نقاط',
-    '10 نقاط',
-    'حاول مرة أخرى',
-    '15 نقطة',
-  ];
-
-  @override
-  Widget build(BuildContext context) => GameScreen('Lucky Wheel', [
-        const Icon(Icons.casino, color: gold, size: 100),
-        Text(result, style: const TextStyle(color: gold, fontSize: 25)),
-        FilledButton(
-          onPressed: () =>
-              setState(() => result = options[Random().nextInt(options.length)]),
-          child: const Text('دور'),
-        ),
-      ]);
-}
-
-// لعبة High / Low
-class HighLowGame extends StatefulWidget {
-  const HighLowGame({super.key});
-
-  @override
-  State<HighLowGame> createState() => _HighLowGameState();
-}
-
-class _HighLowGameState extends State<HighLowGame> {
-  int value = Random().nextInt(13) + 1;
-  int score = 0;
-  String message = '';
-
-  void guess(bool higher) {
-    final next = Random().nextInt(13) + 1;
-    final correct = higher ? next > value : next < value;
-
-    setState(() {
-      message = next == value
-          ? 'تعادل'
-          : (correct ? 'صحيح!' : 'خطأ');
-
-      if (correct) score += 5;
-      value = next;
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) => GameScreen('High / Low', [
-        Text('النقاط: $score', style: const TextStyle(color: gold)),
-        Box(
-          child: Text(
-            'بطاقتك: $value',
-            style: const TextStyle(fontSize: 30),
-          ),
-        ),
-        Text(message),
-        Row(
-          children: [
-            Expanded(
-              child: FilledButton(
-                onPressed: () => guess(true),
-                child: const Text('أعلى'),
-              ),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: FilledButton(
-                onPressed: () => guess(false),
-                child: const Text('أقل'),
-              ),
-            ),
-          ],
-        ),
-        TextButton(
-          onPressed: () => setState(() {
-            value = Random().nextInt(13) + 1;
-            score = 0;
-            message = '';
-          }),
-          child: const Text('إعادة'),
-        ),
-      ]);
-}
-
-// مكونات عامة
-class GameScreen extends StatelessWidget {
-  const GameScreen(this.title, this.children, {super.key});
-
-  final String title;
-  final List<Widget> children;
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: Text(title)),
-        body: ListView(
-          padding: const EdgeInsets.all(16),
-          children: children,
-        ),
-      );
-}
-
-class Box extends StatelessWidget {
-  const Box({super.key, required this.child});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context) => Container(
-        margin: const EdgeInsets.symmetric(vertical: 6),
-        padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Heading('⚙️ الإعدادات'),
+        const Card(
           color: panel,
-          borderRadius: BorderRadius.circular(12),
+          child: ListTile(
+            leading: CircleAvatar(
+              backgroundColor: gold,
+              child: Icon(Icons.person, color: Colors.black),
+            ),
+            title: Text('MERO AI'),
+            subtitle: Text('مساعدك الإبداعي'),
+          ),
         ),
-        child: child,
-      );
+        const ListTile(
+          leading: Icon(Icons.language, color: gold),
+          title: Text('اللغة'),
+          subtitle: Text('العربية'),
+        ),
+        const ListTile(
+          leading: Icon(Icons.palette, color: gold),
+          title: Text('المظهر'),
+          subtitle: Text('أسود وذهبي'),
+        ),
+        const ListTile(
+          leading: Icon(Icons.info, color: gold),
+          title: Text('حول التطبيق'),
+          subtitle: Text('MERO AI - النسخة التجريبية'),
+        ),
+        const ListTile(
+          leading: Icon(Icons.shield, color: gold),
+          title: Text('الخصوصية'),
+          subtitle: Text('لا تشارك بيانات حساسة'),
+        ),
+        const Text(
+          'خدمات الذكاء الاصطناعي تحتاج إعداد خادم وربط API.',
+          style: TextStyle(color: Colors.white54),
+        ),
+      ],
+    );
+  }
 }
+
+// SECTION TITLE
 
 class Heading extends StatelessWidget {
+  final String text;
   const Heading(this.text, {super.key});
 
-  final String text;
-
   @override
-  Widget build(BuildContext context) => Padding(
-        padding: const EdgeInsets.symmetric(vertical: 12),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: gold,
-            fontSize: 20,
-            fontWeight: FontWeight.bold,
-          ),
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 14),
+      child: Text(
+        text,
+        style: const TextStyle(
+          color: gold,
+          fontWeight: FontWeight.bold,
+          fontSize: 18,
         ),
-      );
-}
-
-class GameTile extends StatelessWidget {
-  const GameTile(this.title, this.subtitle, this.icon, this.onTap, {super.key});
-
-  final String title, subtitle;
-  final IconData icon;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) => Box(
-        child: ListTile(
-          onTap: onTap,
-          leading: Icon(icon, color: gold, size: 30),
-          title: Text(title),
-          subtitle: Text(subtitle),
-          trailing: const Icon(Icons.chevron_right, color: gold),
-        ),
-      );
+      ),
+    );
+  }
 }
