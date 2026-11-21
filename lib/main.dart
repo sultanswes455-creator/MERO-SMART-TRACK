@@ -3,14 +3,15 @@ import 'dart:math';
 import 'package:flutter/material.dart';
 
 void main() {
-  runApp(const RoyalJackpotApp());
+  runApp(const RoyalJackpot());
 }
 
-const gold = Color(0xFFD4AF37);
-const black = Color(0xFF080808);
+const gold = Color(0xFFFFC83D);
+const dark = Color(0xFF090909);
+const panel = Color(0xFF191919);
 
-class RoyalJackpotApp extends StatelessWidget {
-  const RoyalJackpotApp({super.key});
+class RoyalJackpot extends StatelessWidget {
+  const RoyalJackpot({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -18,15 +19,18 @@ class RoyalJackpotApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'ROYAL JACKPOT',
       theme: ThemeData.dark().copyWith(
-        scaffoldBackgroundColor: black,
-        colorScheme: const ColorScheme.dark(primary: gold),
+        scaffoldBackgroundColor: dark,
+        colorScheme: const ColorScheme.dark(
+          primary: gold,
+          secondary: gold,
+        ),
       ),
       home: const SplashScreen(),
     );
   }
 }
 
-// شاشة البداية والكرات الذهبية المتحركة
+// شاشة البداية
 class SplashScreen extends StatefulWidget {
   const SplashScreen({super.key});
 
@@ -41,18 +45,18 @@ class _SplashScreenState extends State<SplashScreen>
   @override
   void initState() {
     super.initState();
-
     controller = AnimationController(
       vsync: this,
-      duration: const Duration(seconds: 5),
-    )..repeat();
+      duration: const Duration(seconds: 3),
+    )..repeat(reverse: true);
 
-    Future.delayed(const Duration(seconds: 6), () {
-      if (!mounted) return;
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (_) => const MainPage()),
-      );
+    Future.delayed(const Duration(seconds: 4), () {
+      if (mounted) {
+        Navigator.pushReplacement(
+          context,
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+        );
+      }
     });
   }
 
@@ -62,192 +66,298 @@ class _SplashScreenState extends State<SplashScreen>
     super.dispose();
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: black,
-      body: Stack(
-        children: [
-          Center(
-            child: AnimatedBuilder(
-              animation: controller,
-              builder: (context, child) {
-                return CustomPaint(
-                  size: const Size(340, 340),
-                  painter: SpherePainter(controller.value),
-                );
-              },
-            ),
+  Widget ball(double size, double offset) {
+    return AnimatedBuilder(
+      animation: controller,
+      builder: (context, child) {
+        return Transform.translate(
+          offset: Offset(
+            0,
+            sin(controller.value * pi * 2 + offset) * 15,
           ),
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Spacer(),
-                const Text(
-                  'ROYAL JACKPOT',
-                  style: TextStyle(
-                    color: gold,
-                    fontSize: 29,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 3,
-                  ),
+          child: Container(
+            width: size,
+            height: size,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              gradient: const RadialGradient(
+                center: Alignment(-0.4, -0.5),
+                colors: [
+                  Color(0xFFFFFFD0),
+                  Color(0xFFFFD700),
+                  Color(0xFFB87500),
+                  Color(0xFF563000),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: gold.withValues(alpha: 0.5),
+                  blurRadius: 25,
+                  spreadRadius: 3,
                 ),
-                const SizedBox(height: 12),
-                const Text(
-                  'THE GOLDEN EXPERIENCE',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    letterSpacing: 3,
-                    fontSize: 10,
-                  ),
-                ),
-                const Spacer(),
-                const SizedBox(
-                  width: 120,
-                  child: LinearProgressIndicator(
-                    color: gold,
-                    backgroundColor: Colors.white12,
-                  ),
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'جاري التحميل...',
-                  style: TextStyle(color: Colors.white54),
-                ),
-                const SizedBox(height: 65),
               ],
             ),
           ),
-        ],
+        );
+      },
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        width: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [Color(0xFF000000), Color(0xFF302000)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'ROYAL',
+              style: TextStyle(
+                color: gold,
+                fontSize: 43,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 8,
+              ),
+            ),
+            const Text(
+              'JACKPOT',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 30,
+                fontWeight: FontWeight.bold,
+                letterSpacing: 6,
+              ),
+            ),
+            const SizedBox(height: 65),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ball(75, 0),
+                const SizedBox(width: 15),
+                ball(105, 2),
+                const SizedBox(width: 15),
+                ball(75, 4),
+              ],
+            ),
+            const SizedBox(height: 60),
+            const CircularProgressIndicator(color: gold),
+            const SizedBox(height: 20),
+            const Text(
+              'WELCOME TO ROYAL JACKPOT',
+              style: TextStyle(color: gold, letterSpacing: 2),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class SpherePainter extends CustomPainter {
-  final double phase;
-  SpherePainter(this.phase);
+// تسجيل الدخول وإنشاء الحساب
+class LoginScreen extends StatefulWidget {
+  const LoginScreen({super.key});
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(size.width / 2, size.height / 2);
+  State<LoginScreen> createState() => _LoginScreenState();
+}
 
-    final angles = [
-      phase * 2 * pi,
-      phase * 2 * pi + 2.1,
-      phase * 2 * pi + 4.2,
-    ];
+class _LoginScreenState extends State<LoginScreen> {
+  final nameController = TextEditingController();
+  final passwordController = TextEditingController();
+  bool createAccount = false;
 
-    final radii = [55.0, 40.0, 30.0];
-
-    for (int i = 0; i < 3; i++) {
-      final a = angles[i];
-      final depth = 0.72 + 0.28 * ((sin(a) + 1) / 2);
-
-      final position = Offset(
-        center.dx + cos(a) * 95,
-        center.dy + sin(a) * 55,
+  void enter() {
+    if (nameController.text.trim().isEmpty ||
+        passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('يرجى إدخال اسم المستخدم وكلمة المرور')),
       );
-
-      final radius = radii[i] * depth;
-
-      canvas.drawCircle(
-        position.translate(5, radius * 0.7),
-        radius,
-        Paint()
-          ..color = Colors.black
-          ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 15),
-      );
-
-      final paint = Paint()
-        ..shader = const RadialGradient(
-          center: Alignment(-0.4, -0.5),
-          colors: [
-            Color(0xFFFFF5C2),
-            Color(0xFFFFD65A),
-            Color(0xFFD49A19),
-            Color(0xFF754600),
-            Color(0xFF241500),
-          ],
-        ).createShader(
-          Rect.fromCircle(center: position, radius: radius),
-        );
-
-      canvas.drawCircle(position, radius, paint);
-
-      canvas.drawCircle(
-        position.translate(-radius * 0.3, -radius * 0.4),
-        radius * 0.18,
-        Paint()..color = Colors.white.withOpacity(0.65),
-      );
-
-      canvas.drawCircle(
-        position,
-        radius,
-        Paint()
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 1.2
-          ..color = const Color(0xFFFFE7A0).withOpacity(0.5),
-      );
+      return;
     }
+
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => MainPage(username: nameController.text.trim()),
+      ),
+    );
   }
 
   @override
-  bool shouldRepaint(covariant SpherePainter oldDelegate) =>
-      oldDelegate.phase != phase;
+  void dispose() {
+    nameController.dispose();
+    passwordController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Container(
+        padding: const EdgeInsets.all(25),
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            colors: [dark, Color(0xFF342300)],
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+          ),
+        ),
+        child: Center(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                const Icon(Icons.diamond, color: gold, size: 75),
+                const SizedBox(height: 15),
+                const Text(
+                  'ROYAL JACKPOT',
+                  style: TextStyle(
+                    color: gold,
+                    fontSize: 29,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 35),
+                Text(
+                  createAccount ? 'إنشاء حساب جديد' : 'تسجيل الدخول',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 23,
+                  ),
+                ),
+                const SizedBox(height: 25),
+                TextField(
+                  controller: nameController,
+                  textDirection: TextDirection.rtl,
+                  decoration: inputDecoration('اسم المستخدم', Icons.person),
+                ),
+                const SizedBox(height: 15),
+                TextField(
+                  controller: passwordController,
+                  obscureText: true,
+                  decoration: inputDecoration('كلمة المرور', Icons.lock),
+                ),
+                const SizedBox(height: 25),
+                SizedBox(
+                  width: double.infinity,
+                  height: 52,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: gold,
+                      foregroundColor: Colors.black,
+                    ),
+                    onPressed: enter,
+                    child: Text(
+                      createAccount ? 'إنشاء الحساب' : 'دخول',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
+                TextButton(
+                  onPressed: () {
+                    setState(() => createAccount = !createAccount);
+                  },
+                  child: Text(
+                    createAccount
+                        ? 'لديك حساب؟ تسجيل الدخول'
+                        : 'ليس لديك حساب؟ إنشاء حساب',
+                    style: const TextStyle(color: gold),
+                  ),
+                ),
+                const SizedBox(height: 15),
+                const Text(
+                  'حساب تجريبي محلي: لا يتم حفظ البيانات على خادم.',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white54, fontSize: 12),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
-// الشاشة الرئيسية
+InputDecoration inputDecoration(String label, IconData icon) {
+  return InputDecoration(
+    labelText: label,
+    prefixIcon: Icon(icon, color: gold),
+    filled: true,
+    fillColor: panel,
+    border: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+    ),
+    enabledBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: Colors.white24),
+    ),
+    focusedBorder: OutlineInputBorder(
+      borderRadius: BorderRadius.circular(14),
+      borderSide: const BorderSide(color: gold),
+    ),
+  );
+}
+
+// الصفحة الرئيسية
 class MainPage extends StatefulWidget {
-  const MainPage({super.key});
+  final String username;
+
+  const MainPage({super.key, required this.username});
 
   @override
   State<MainPage> createState() => _MainPageState();
 }
 
 class _MainPageState extends State<MainPage> {
-  int selected = 0;
-
-  final pages = const [
-    HomeScreen(),
-    SlotsScreen(),
-    AccountScreen(),
-  ];
+  int selectedIndex = 0;
+  int points = 1000;
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: black,
-        centerTitle: true,
-        title: const Text(
-          'ROYAL JACKPOT',
-          style: TextStyle(
-            color: gold,
-            fontWeight: FontWeight.bold,
-            letterSpacing: 2,
-          ),
-        ),
+    final pages = [
+      HomeScreen(
+        username: widget.username,
+        points: points,
+        openSlots: () => setState(() => selectedIndex = 1),
+        openAccount: () => setState(() => selectedIndex = 2),
       ),
-      body: pages[selected],
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: const Color(0xFF191919),
-        indicatorColor: const Color(0xFF66521B),
-        selectedIndex: selected,
-        onDestinationSelected: (i) {
-          setState(() => selected = i);
-        },
-        destinations: const [
-          NavigationDestination(
+      SlotsScreen(
+        points: points,
+        onPointsChanged: (value) => setState(() => points = value),
+      ),
+      AccountScreen(username: widget.username, points: points),
+    ];
+
+    return Scaffold(
+      body: SafeArea(child: pages[selectedIndex]),
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: selectedIndex,
+        onTap: (index) => setState(() => selectedIndex = index),
+        backgroundColor: const Color(0xFF171717),
+        selectedItemColor: gold,
+        unselectedItemColor: Colors.white54,
+        type: BottomNavigationBarType.fixed,
+        items: const [
+          BottomNavigationBarItem(
             icon: Icon(Icons.home),
             label: 'الرئيسية',
           ),
-          NavigationDestination(
+          BottomNavigationBarItem(
             icon: Icon(Icons.casino),
-            label: 'السلوتات',
+            label: 'الألعاب',
           ),
-          NavigationDestination(
+          BottomNavigationBarItem(
             icon: Icon(Icons.person),
             label: 'حسابي',
           ),
@@ -257,87 +367,178 @@ class _MainPageState extends State<MainPage> {
   }
 }
 
+// الصفحة الرئيسية
 class HomeScreen extends StatelessWidget {
-  const HomeScreen({super.key});
+  final String username;
+  final int points;
+  final VoidCallback openSlots;
+  final VoidCallback openAccount;
+
+  const HomeScreen({
+    super.key,
+    required this.username,
+    required this.points,
+    required this.openSlots,
+    required this.openAccount,
+  });
+
+  Widget category(
+    String title,
+    IconData icon,
+    VoidCallback action,
+  ) {
+    return InkWell(
+      onTap: action,
+      borderRadius: BorderRadius.circular(16),
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          color: panel,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(color: gold.withValues(alpha: 0.5)),
+        ),
+        child: Column(
+          children: [
+            Icon(icon, color: gold, size: 38),
+            const SizedBox(height: 12),
+            Text(
+              title,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       padding: const EdgeInsets.all(18),
       children: [
-        Container(
-          padding: const EdgeInsets.all(25),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF4B370D), Color(0xFF17120A)],
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            const Text(
+              'ROYAL JACKPOT',
+              style: TextStyle(
+                color: gold,
+                fontSize: 22,
+                fontWeight: FontWeight.bold,
+              ),
             ),
-            border: Border.all(color: gold),
+            IconButton(
+              onPressed: openAccount,
+              icon: const Icon(Icons.person, color: gold, size: 30),
+            ),
+          ],
+        ),
+        const SizedBox(height: 25),
+        Container(
+          padding: const EdgeInsets.all(22),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF755000), Color(0xFF241800)],
+            ),
           ),
-          child: const Column(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(Icons.emoji_events, color: gold, size: 75),
-              SizedBox(height: 15),
               Text(
-                'ROYAL JACKPOT',
-                style: TextStyle(
+                'أهلاً بك $username',
+                style: const TextStyle(fontSize: 20),
+              ),
+              const SizedBox(height: 15),
+              const Text('رصيدك التجريبي'),
+              Text(
+                '$points نقطة',
+                style: const TextStyle(
                   color: gold,
-                  fontSize: 25,
+                  fontSize: 30,
                   fontWeight: FontWeight.bold,
                 ),
-              ),
-              SizedBox(height: 10),
-              Text(
-                'مرحباً بك في عالم الألعاب والترفيه',
-                textAlign: TextAlign.center,
-                style: TextStyle(color: Colors.white),
               ),
             ],
           ),
         ),
-        const SizedBox(height: 25),
+        const SizedBox(height: 28),
         const Text(
           'الأقسام الرئيسية',
-          style: TextStyle(color: gold, fontSize: 21),
+          style: TextStyle(
+            color: gold,
+            fontSize: 21,
+            fontWeight: FontWeight.bold,
+          ),
         ),
         const SizedBox(height: 15),
-        category(Icons.casino, 'ألعاب السلوتس'),
-        category(Icons.stars, 'الألعاب المميزة'),
-        category(Icons.person, 'حساب المستخدم'),
-        const SizedBox(height: 20),
+        GridView.count(
+          crossAxisCount: 2,
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          crossAxisSpacing: 12,
+          mainAxisSpacing: 12,
+          childAspectRatio: 1.3,
+          children: [
+            category('ألعاب السلوتس', Icons.casino, openSlots),
+            category('الألعاب المميزة', Icons.stars, openSlots),
+            category('حساب المستخدم', Icons.person, openAccount),
+            category('رصيد النقاط', Icons.account_balance_wallet, openAccount),
+          ],
+        ),
+        const SizedBox(height: 25),
         const Text(
-          'جميع الألعاب تجريبية بالنقاط الافتراضية فقط.',
-          textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white38),
+          'اكتشف ألعابنا',
+          style: TextStyle(color: gold, fontSize: 20),
+        ),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: openSlots,
+          child: Container(
+            height: 130,
+            decoration: BoxDecoration(
+              color: const Color(0xFF29200C),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: gold),
+            ),
+            child: const Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.casino, color: gold, size: 45),
+                  SizedBox(height: 8),
+                  Text(
+                    'ROYAL SLOTS',
+                    style: TextStyle(
+                      color: gold,
+                      fontSize: 22,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Text('اضغط للعب بالنقاط التجريبية'),
+                ],
+              ),
+            ),
+          ),
         ),
       ],
     );
   }
-
-  Widget category(IconData icon, String name) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: const Color(0xFF191919),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: gold.withOpacity(0.5)),
-      ),
-      child: Row(
-        children: [
-          Icon(icon, color: gold, size: 30),
-          const SizedBox(width: 15),
-          Text(name, style: const TextStyle(color: Colors.white)),
-          const Spacer(),
-          const Icon(Icons.arrow_forward_ios, color: gold, size: 16),
-        ],
-      ),
-    );
-  }
 }
 
+// لعبة السلوتس
 class SlotsScreen extends StatefulWidget {
-  const SlotsScreen({super.key});
+  final int points;
+  final ValueChanged<int> onPointsChanged;
+
+  const SlotsScreen({
+    super.key,
+    required this.points,
+    required this.onPointsChanged,
+  });
 
   @override
   State<SlotsScreen> createState() => _SlotsScreenState();
@@ -345,177 +546,246 @@ class SlotsScreen extends StatefulWidget {
 
 class _SlotsScreenState extends State<SlotsScreen> {
   final random = Random();
-  final symbols = ['💎', '🍒', '7️⃣', '⭐', '🍀', '🔔'];
-
-  List<String> reels = ['💎', '🍒', '⭐'];
-  int points = 1000;
+  List<String> symbols = ['🍒', '🍋', '💎'];
   bool spinning = false;
-  String message = 'حظاً سعيداً!';
+  String message = 'اضغط على زر اللعب';
 
-  Future<void> spin() async {
+  void spin() async {
     if (spinning) return;
 
-    if (points < 10) {
-      setState(() => message = 'لا توجد نقاط كافية!');
+    if (widget.points < 10) {
+      setState(() => message = 'رصيد النقاط غير كافٍ');
       return;
     }
 
     setState(() {
       spinning = true;
-      points -= 10;
-      message = 'تدور البكرات...';
+      message = 'حظاً سعيداً!';
+      widget.onPointsChanged(widget.points - 10);
     });
 
-    for (int i = 0; i < 15; i++) {
-      await Future.delayed(const Duration(milliseconds: 110));
-      if (!mounted) return;
+    await Future.delayed(const Duration(milliseconds: 900));
 
-      setState(() {
-        reels = List.generate(
-          3,
-          (_) => symbols[random.nextInt(symbols.length)],
-        );
-      });
-    }
+    final result = List.generate(
+      3,
+      (_) => ['🍒', '🍋', '💎', '7️⃣', '⭐'][random.nextInt(5)],
+    );
 
     int reward = 0;
-
-    if (reels[0] == reels[1] && reels[1] == reels[2]) {
+    if (result[0] == result[1] && result[1] == result[2]) {
       reward = 100;
-    } else if (reels[0] == reels[1] ||
-        reels[1] == reels[2] ||
-        reels[0] == reels[2]) {
+    } else if (result[0] == result[1] || result[1] == result[2]) {
       reward = 20;
     }
 
     setState(() {
-      points += reward;
+      symbols = result;
       spinning = false;
-      message = reward == 100
-          ? '🎉 JACKPOT! ربحت 100 نقطة!'
-          : reward == 20
-              ? 'مبروك! ربحت 20 نقطة!'
-              : 'حاول مرة أخرى!';
+      widget.onPointsChanged(widget.points + reward);
+      message = reward > 0
+          ? 'مبروك! ربحت $reward نقطة'
+          : 'حاول مرة أخرى!';
     });
   }
 
   @override
   Widget build(BuildContext context) {
     return ListView(
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(20),
       children: [
         const Text(
           'ROYAL SLOTS',
           textAlign: TextAlign.center,
           style: TextStyle(
             color: gold,
-            fontSize: 27,
+            fontSize: 28,
             fontWeight: FontWeight.bold,
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 15),
         Container(
-          padding: const EdgeInsets.all(15),
+          padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: const Color(0xFF1B1B1B),
-            border: Border.all(color: gold, width: 2),
+            color: panel,
             borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: gold),
           ),
           child: Column(
             children: [
-              const Text('رصيد النقاط'),
+              const Text(
+                'رصيدك',
+                style: TextStyle(color: Colors.white70),
+              ),
               Text(
-                '$points',
+                '${widget.points} نقطة',
                 style: const TextStyle(
                   color: gold,
-                  fontSize: 30,
+                  fontSize: 27,
                   fontWeight: FontWeight.bold,
                 ),
               ),
-              const SizedBox(height: 25),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: reels.map((symbol) {
-                  return Container(
-                    width: 85,
-                    height: 100,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      color: Colors.black,
-                      border: Border.all(color: gold, width: 2),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      symbol,
-                      style: const TextStyle(fontSize: 40),
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-              Text(
-                message,
-                textAlign: TextAlign.center,
-                style: const TextStyle(color: gold, fontSize: 16),
-              ),
-              const SizedBox(height: 20),
-              SizedBox(
-                width: double.infinity,
-                height: 55,
-                child: ElevatedButton(
-                  onPressed: spinning ? null : spin,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: gold,
-                    foregroundColor: Colors.black,
-                  ),
-                  child: Text(
-                    spinning ? 'SPINNING...' : '🎰 SPIN',
-                    style: const TextStyle(
-                      fontSize: 22,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 35),
+        Container(
+          padding: const EdgeInsets.symmetric(vertical: 35, horizontal: 10),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [Color(0xFF664400), Color(0xFF211600)],
+            ),
+            borderRadius: BorderRadius.circular(22),
+            border: Border.all(color: gold, width: 2),
+            boxShadow: [
+              BoxShadow(
+                color: gold.withValues(alpha: 0.2),
+                blurRadius: 20,
               ),
             ],
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: symbols.map((symbol) {
+              return Container(
+                width: 75,
+                height: 90,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF111111),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: gold),
+                ),
+                child: Text(
+                  symbol,
+                  style: const TextStyle(fontSize: 37),
+                ),
+              );
+            }).toList(),
+          ),
+        ),
+        const SizedBox(height: 25),
+        Text(
+          message,
+          textAlign: TextAlign.center,
+          style: const TextStyle(
+            color: gold,
+            fontSize: 19,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 25),
+        SizedBox(
+          height: 55,
+          child: ElevatedButton(
+            onPressed: spinning ? null : spin,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: gold,
+              foregroundColor: Colors.black,
+            ),
+            child: Text(
+              spinning ? 'جاري اللعب...' : 'العب الآن - 10 نقاط',
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 20),
         const Text(
           'ثلاثة رموز متطابقة = 100 نقطة\nرمزان متطابقان = 20 نقطة',
           textAlign: TextAlign.center,
-          style: TextStyle(color: Colors.white70, height: 2),
+          style: TextStyle(color: Colors.white70, height: 1.8),
+        ),
+        const SizedBox(height: 20),
+        const Text(
+          'هذه لعبة ترفيهية تجريبية بنقاط افتراضية فقط، ولا تتضمن أموالاً حقيقية أو سحباً أو إيداعاً.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white38, fontSize: 12),
         ),
       ],
     );
   }
 }
 
+// حساب المستخدم
 class AccountScreen extends StatelessWidget {
-  const AccountScreen({super.key});
+  final String username;
+  final int points;
+
+  const AccountScreen({
+    super.key,
+    required this.username,
+    required this.points,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return const Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+    return ListView(
+      padding: const EdgeInsets.all(20),
+      children: [
+        const SizedBox(height: 20),
+        const Icon(Icons.account_circle, color: gold, size: 100),
+        const SizedBox(height: 15),
+        const Text(
+          'حساب المستخدم',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: gold,
+            fontSize: 25,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 30),
+        accountRow(Icons.person, 'اسم المستخدم', username),
+        accountRow(Icons.stars, 'النقاط التجريبية', '$points نقطة'),
+        accountRow(Icons.verified_user, 'نوع الحساب', 'حساب تجريبي'),
+        const SizedBox(height: 35),
+        ElevatedButton.icon(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: gold,
+            foregroundColor: Colors.black,
+            padding: const EdgeInsets.all(15),
+          ),
+          onPressed: () {
+            Navigator.pushAndRemoveUntil(
+              context,
+              MaterialPageRoute(
+                builder: (_) => const LoginScreen(),
+              ),
+              (route) => false,
+            );
+          },
+          icon: const Icon(Icons.logout),
+          label: const Text('تسجيل الخروج'),
+        ),
+        const SizedBox(height: 25),
+        const Text(
+          'بيانات الحساب تجريبية ومحلية وليست مرتبطة بخادم أو نظام تسجيل حقيقي.',
+          textAlign: TextAlign.center,
+          style: TextStyle(color: Colors.white38, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget accountRow(IconData icon, String title, String value) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: panel,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: Colors.white12),
+      ),
+      child: Row(
         children: [
-          Icon(Icons.account_circle, color: gold, size: 85),
-          SizedBox(height: 15),
-          Text(
-            'حساب المستخدم',
-            style: TextStyle(color: gold, fontSize: 24),
+          Icon(icon, color: gold),
+          const SizedBox(width: 15),
+          Expanded(
+            child: Text(title, style: const TextStyle(color: Colors.white70)),
           ),
-          SizedBox(height: 10),
-          Text(
-            'مرحباً بك في ROYAL JACKPOT',
-            style: TextStyle(color: Colors.white70),
-          ),
-          SizedBox(height: 10),
-          Text(
-            'حساب تجريبي',
-            style: TextStyle(color: Colors.white38),
-          ),
+          Text(value, style: const TextStyle(color: gold)),
         ],
       ),
     );
