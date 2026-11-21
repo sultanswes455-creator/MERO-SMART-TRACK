@@ -17,6 +17,9 @@ jobs:
         with:
           channel: stable
 
+      - name: Generate Android project
+        run: flutter create --platforms=android --project-name mero_ai .
+
       - name: Install dependencies
         run: flutter pub get
 
