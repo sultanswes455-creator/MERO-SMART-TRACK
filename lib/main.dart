@@ -1,425 +1,728 @@
-import 'dart:math' as math;
+
+import 'dart:math';
 import 'package:flutter/material.dart';
-import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
-const Color neon = Color(0xFF00F58A);
-const Color dark = Color(0xFF07100B);
+void main() => runApp(const MeroPlay());
 
-void main() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const SnakApp());
-}
+const gold = Color(0xFFFFC400);
+const bg = Color(0xFF101113);
+const panel = Color(0xFF222326);
 
-@pragma('vm:entry-point')
-void overlayMain() {
-  WidgetsFlutterBinding.ensureInitialized();
-  runApp(const MaterialApp(
-    debugShowCheckedModeBanner: false,
-    home: TrainingOverlay(),
-  ));
-}
-
-class SnakApp extends StatelessWidget {
-  const SnakApp({super.key});
+class MeroPlay extends StatelessWidget {
+  const MeroPlay({super.key});
 
   @override
-  Widget build(BuildContext context) => MaterialApp(
-        debugShowCheckedModeBanner: false,
-        theme: ThemeData.dark().copyWith(
-          scaffoldBackgroundColor: dark,
-          colorScheme: const ColorScheme.dark(primary: neon),
-        ),
-        home: const ActivationPage(),
-      );
-}
-
-class ActivationPage extends StatefulWidget {
-  const ActivationPage({super.key});
-
-  @override
-  State<ActivationPage> createState() => _ActivationPageState();
-}
-
-class _ActivationPageState extends State<ActivationPage> {
-  final TextEditingController code = TextEditingController();
-  String error = '';
-
-  void enter() {
-    if (code.text.trim() == '3111') {
-      Navigator.of(context).pushReplacement(
-        MaterialPageRoute(builder: (_) => const HomePage()),
-      );
-    } else {
-      setState(() => error = 'كود التفعيل غير صحيح');
-    }
-  }
-
-  @override
-  void dispose() {
-    code.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        body: Center(
-          child: SingleChildScrollView(
-            padding: const EdgeInsets.all(24),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(Icons.sports_esports, color: neon, size: 72),
-                const SizedBox(height: 16),
-                const Text(
-                  'SNAK TRAINING',
-                  style: TextStyle(
-                    color: neon,
-                    fontSize: 25,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                TextField(
-                  controller: code,
-                  obscureText: true,
-                  keyboardType: TextInputType.number,
-                  textAlign: TextAlign.center,
-                  decoration: InputDecoration(
-                    hintText: 'أدخل كود التفعيل',
-                    errorText: error.isEmpty ? null : error,
-                    border: const OutlineInputBorder(),
-                  ),
-                  onSubmitted: (_) => enter(),
-                ),
-                const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: enter,
-                    child: const Text('دخول'),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      );
-}
-
-class HomePage extends StatefulWidget {
-  const HomePage({super.key});
-
-  @override
-  State<HomePage> createState() => _HomePageState();
-}
-
-class _HomePageState extends State<HomePage> {
-  String status = 'جاهز';
-
-  Future<void> startOverlay() async {
-    try {
-      bool permitted =
-          await FlutterOverlayWindow.isPermissionGranted();
-
-      if (!permitted) {
-        permitted =
-            await FlutterOverlayWindow.requestPermission() ?? false;
-      }
-
-      if (!permitted) {
-        setState(() =>
-            status = 'لم يتم منح إذن الظهور فوق التطبيقات');
-        return;
-      }
-
-      await FlutterOverlayWindow.showOverlay(
-        height: 470,
-        width: 310,
-        enableDrag: true,
-        overlayTitle: 'SNAK TRAINING',
-        overlayContent: 'أدوات تدريب يدوية',
-      );
-
-      setState(() => status = 'تم طلب تشغيل النافذة العائمة');
-    } catch (e) {
-      setState(() => status = 'خطأ: $e');
-    }
-  }
-
-  Future<void> stopOverlay() async {
-    await FlutterOverlayWindow.closeOverlay();
-    if (mounted) {
-      setState(() => status = 'تم إيقاف النافذة');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) => Scaffold(
-        appBar: AppBar(title: const Text('SNAK TRAINING')),
-        body: Center(
-          child: Padding(
-            padding: const EdgeInsets.all(22),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                const Icon(
-                  Icons.sports_esports,
-                  color: neon,
-                  size: 70,
-                ),
-                const SizedBox(height: 18),
-                const Text(
-                  'مساعد تدريب 8 Ball Pool',
-                  style: TextStyle(fontSize: 20),
-                ),
-                const SizedBox(height: 22),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton.icon(
-                    onPressed: startOverlay,
-                    icon: const Icon(Icons.play_arrow),
-                    label: const Text('تشغيل النافذة العائمة'),
-                  ),
-                ),
-                const SizedBox(height: 10),
-                OutlinedButton.icon(
-                  onPressed: stopOverlay,
-                  icon: const Icon(Icons.close),
-                  label: const Text('إيقاف النافذة'),
-                ),
-                const SizedBox(height: 18),
-                Text(status, textAlign: TextAlign.center),
-              ],
-            ),
-          ),
-        ),
-      );
-}
-
-class TrainingOverlay extends StatefulWidget {
-  const TrainingOverlay({super.key});
-
-  @override
-  State<TrainingOverlay> createState() =>
-      _TrainingOverlayState();
-}
-
-class _TrainingOverlayState extends State<TrainingOverlay> {
-  double angle = 45;
-  double power = 60;
-  Offset spin = Offset.zero;
-  bool expanded = true;
-
-  Future<void> toggleSize() async {
-    setState(() => expanded = !expanded);
-
-    await FlutterOverlayWindow.resizeOverlay(
-      310,
-      expanded ? 470 : 76,
-      true,
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      title: 'MERO PLAY',
+      theme: ThemeData.dark().copyWith(
+        scaffoldBackgroundColor: bg,
+        colorScheme: const ColorScheme.dark(primary: gold),
+      ),
+      home: const MainPage(),
     );
+  }
+}
+
+class WalletRequest {
+  WalletRequest(this.type, this.amount);
+  final String type;
+  final double amount;
+  bool processed = false;
+  bool accepted = false;
+}
+
+class MainPage extends StatefulWidget {
+  const MainPage({super.key});
+
+  @override
+  State<MainPage> createState() => _MainPageState();
+}
+
+class _MainPageState extends State<MainPage> {
+  int tab = 0;
+  double points = 500;
+  final requests = <WalletRequest>[];
+
+  void sendRequest(String type, double amount) {
+    setState(() => requests.add(WalletRequest(type, amount)));
+  }
+
+  void accept(WalletRequest r) {
+    setState(() {
+      r.processed = true;
+      r.accepted = true;
+      if (r.type == 'إضافة نقاط') {
+        points += r.amount;
+      } else {
+        points -= r.amount;
+      }
+    });
+  }
+
+  void reject(WalletRequest r) {
+    setState(() {
+      r.processed = true;
+      r.accepted = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      type: MaterialType.transparency,
-      child: Align(
-        alignment: Alignment.topCenter,
-        child: Container(
-          margin: const EdgeInsets.all(5),
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: const Color(0xF20A120D),
-            border: Border.all(color: neon, width: 1.5),
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Row(
-                children: [
-                  const Icon(
-                    Icons.sports_esports,
-                    color: neon,
-                    size: 18,
-                  ),
-                  const SizedBox(width: 7),
-                  const Expanded(
-                    child: Text(
-                      'SNAK TRAINING',
-                      style: TextStyle(
-                        color: neon,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: toggleSize,
-                    icon: Icon(
-                      expanded
-                          ? Icons.expand_less
-                          : Icons.expand_more,
-                      color: Colors.white,
-                    ),
-                  ),
-                  IconButton(
-                    visualDensity: VisualDensity.compact,
-                    onPressed: () =>
-                        FlutterOverlayWindow.closeOverlay(),
-                    icon: const Icon(
-                      Icons.close,
-                      color: Colors.red,
-                    ),
-                  ),
-                ],
-              ),
-              if (expanded) ...[
-                const Divider(color: neon, height: 8),
-                Text('زاوية التصويب: ${angle.round()}°'),
-                Slider(
-                  value: angle,
-                  min: 0,
-                  max: 360,
-                  activeColor: neon,
-                  onChanged: (v) =>
-                      setState(() => angle = v),
-                ),
-                Text('قوة الضربة: ${power.round()}%'),
-                Slider(
-                  value: power,
-                  min: 1,
-                  max: 100,
-                  activeColor: neon,
-                  onChanged: (v) =>
-                      setState(() => power = v),
-                ),
-                const Text(
-                  'تحكم السبين اليدوي',
-                  style: TextStyle(color: neon),
-                ),
-                GestureDetector(
-                  onPanUpdate: (d) => setState(() {
-                    spin = Offset(
-                      (spin.dx + d.delta.dx / 45)
-                          .clamp(-1.0, 1.0)
-                          .toDouble(),
-                      (spin.dy + d.delta.dy / 45)
-                          .clamp(-1.0, 1.0)
-                          .toDouble(),
-                    );
-                  }),
-                  child: SizedBox(
-                    width: 104,
-                    height: 104,
-                    child: DecoratedBox(
-                      decoration: const BoxDecoration(
-                        color: Colors.white,
-                        shape: BoxShape.circle,
-                      ),
-                      child: Stack(
-                        children: [
-                          const Center(
-                            child: CircleAvatar(
-                              radius: 4,
-                              backgroundColor: Colors.black26,
-                            ),
-                          ),
-                          Positioned(
-                            left: 45 + spin.dx * 38,
-                            top: 45 + spin.dy * 38,
-                            child: const CircleAvatar(
-                              radius: 7,
-                              backgroundColor: Colors.red,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 5),
-                Text(
-                  'X ${spin.dx.toStringAsFixed(2)}   '
-                  'Y ${spin.dy.toStringAsFixed(2)}',
-                  style: const TextStyle(
-                    color: neon,
-                    fontSize: 11,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                CustomPaint(
-                  size: const Size(260, 70),
-                  painter: AimPainter(angle, power, spin),
-                ),
-                const Text(
-                  'مؤشر تدريبي يدوي — لا يتتبع كرات اللعبة تلقائياً',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 10,
-                  ),
-                ),
-              ],
-            ],
-          ),
-        ),
+    final pages = [
+      HomePage(
+        points: points,
+        goWallet: () => setState(() => tab = 3),
+        goGames: () => setState(() => tab = 2),
+      ),
+      const SportsPage(),
+      const GamesPage(),
+      WalletPage(points: points, requests: requests, onSend: sendRequest),
+      AdminPage(requests: requests, onAccept: accept, onReject: reject),
+    ];
+
+    return Scaffold(
+      appBar: AppBar(
+        centerTitle: true,
+        title: const Text('MERO PLAY',
+            style: TextStyle(color: gold, fontWeight: FontWeight.bold)),
+      ),
+      body: pages[tab],
+      bottomNavigationBar: NavigationBar(
+        backgroundColor: panel,
+        selectedIndex: tab,
+        indicatorColor: gold.withOpacity(.2),
+        onDestinationSelected: (i) => setState(() => tab = i),
+        destinations: const [
+          NavigationDestination(icon: Icon(Icons.home), label: 'الرئيسية'),
+          NavigationDestination(icon: Icon(Icons.sports_soccer), label: 'رياضة'),
+          NavigationDestination(icon: Icon(Icons.games), label: 'الألعاب'),
+          NavigationDestination(icon: Icon(Icons.wallet), label: 'المحفظة'),
+          NavigationDestination(icon: Icon(Icons.admin_panel_settings), label: 'إدارة'),
+        ],
       ),
     );
   }
 }
 
-class AimPainter extends CustomPainter {
-  final double angle;
-  final double power;
-  final Offset spin;
+// الرئيسية
+class HomePage extends StatelessWidget {
+  const HomePage({
+    super.key,
+    required this.points,
+    required this.goWallet,
+    required this.goGames,
+  });
 
-  AimPainter(this.angle, this.power, this.spin);
+  final double points;
+  final VoidCallback goWallet, goGames;
 
   @override
-  void paint(Canvas canvas, Size size) {
-    final center = Offset(
-      size.width / 2,
-      size.height / 2,
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        Container(
+          height: 150,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(18),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF604900), bg],
+            ),
+          ),
+          child: const Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.stars, color: gold, size: 45),
+                Text('MERO PLAY',
+                    style: TextStyle(
+                        color: gold, fontSize: 27, fontWeight: FontWeight.bold)),
+                Text('ألعاب ترفيهية • نقاط افتراضية'),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Box(
+          child: Column(
+            children: [
+              const Text('رصيدك التجريبي'),
+              Text('${points.toStringAsFixed(2)} نقطة',
+                  style: const TextStyle(
+                      color: gold, fontSize: 27, fontWeight: FontWeight.bold)),
+              FilledButton(onPressed: goWallet, child: const Text('المحفظة')),
+            ],
+          ),
+        ),
+        const Heading('الألعاب المميزة'),
+        GameTile('Sky Run', 'لعبة طيران', Icons.flight,
+            () => openGame(context, const SkyGame())),
+        GameTile('Kamikaze Grid', 'لعبة الخانات والمراحل', Icons.grid_4x4,
+            () => openGame(context, const GridGame())),
+        GameTile('Mines Puzzle', 'تحدي شبكة', Icons.bomb,
+            () => openGame(context, const MinesGame())),
+        GameTile('Lucky Wheel', 'عجلة عشوائية', Icons.casino,
+            () => openGame(context, const WheelGame())),
+        GameTile('High / Low', 'توقع البطاقات', Icons.style,
+            () => openGame(context, const HighLowGame())),
+        FilledButton(onPressed: goGames, child: const Text('عرض جميع الألعاب')),
+      ],
     );
+  }
+}
 
-    final radians = angle * math.pi / 180;
+void openGame(BuildContext c, Widget game) {
+  Navigator.push(c, MaterialPageRoute(builder: (_) => game));
+}
 
-    final direction = Offset(
-      math.cos(radians),
-      -math.sin(radians),
+// الألعاب
+class GamesPage extends StatelessWidget {
+  const GamesPage({super.key});
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Heading('الألعاب'),
+          GameTile('Sky Run', 'تحدي طيران', Icons.flight,
+              () => openGame(context, const SkyGame())),
+          GameTile('Kamikaze Grid', 'مراحل وخانات', Icons.grid_4x4,
+              () => openGame(context, const GridGame())),
+          GameTile('Mines Puzzle', 'لوحة 5 × 5', Icons.bomb,
+              () => openGame(context, const MinesGame())),
+          GameTile('Lucky Wheel', 'عجلة', Icons.casino,
+              () => openGame(context, const WheelGame())),
+          GameTile('High / Low', 'بطاقات', Icons.style,
+              () => openGame(context, const HighLowGame())),
+        ],
+      );
+}
+
+// توقع رياضي ترفيهي
+class SportsPage extends StatefulWidget {
+  const SportsPage({super.key});
+
+  @override
+  State<SportsPage> createState() => _SportsPageState();
+}
+
+class _SportsPageState extends State<SportsPage> {
+  int? choice;
+  bool saved = false;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Heading('توقع رياضي ترفيهي'),
+          const Box(
+            child: Text('مباراة افتراضية\nالفريق A  ×  الفريق B',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 20)),
+          ),
+          const Text('اختر توقعًا:'),
+          ...['فوز الفريق A', 'تعادل', 'فوز الفريق B']
+              .asMap()
+              .entries
+              .map((e) => RadioListTile<int>(
+                    value: e.key,
+                    groupValue: choice,
+                    onChanged: saved ? null : (v) => setState(() => choice = v),
+                    title: Text(e.value),
+                  )),
+          FilledButton(
+            onPressed: choice == null || saved
+                ? null
+                : () => setState(() => saved = true),
+            child: const Text('حفظ التوقع'),
+          ),
+          if (saved) const Text('تم حفظ توقعك الترفيهي.'),
+        ],
+      );
+}
+
+// المحفظة التجريبية
+class WalletPage extends StatelessWidget {
+  const WalletPage({
+    super.key,
+    required this.points,
+    required this.requests,
+    required this.onSend,
+  });
+
+  final double points;
+  final List<WalletRequest> requests;
+  final void Function(String, double) onSend;
+
+  Future<void> showRequest(BuildContext context, String type) async {
+    final controller = TextEditingController();
+
+    await showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: panel,
+        title: Text(type, textAlign: TextAlign.center),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('نقاط تجريبية فقط'),
+            TextField(
+              controller: controller,
+              keyboardType:
+                  const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'الكمية',
+                suffixText: 'نقاط',
+              ),
+            ),
+            const Text('من 10 إلى 200 نقطة'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('إلغاء'),
+          ),
+          FilledButton(
+            onPressed: () {
+              final value = double.tryParse(controller.text);
+              if (value == null ||
+                  value < 10 ||
+                  value > 200 ||
+                  (type == 'إزالة نقاط' && value > points)) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('الكمية غير صالحة')),
+                );
+                return;
+              }
+              onSend(type, value);
+              Navigator.pop(ctx);
+            },
+            child: const Text('تأكيد'),
+          ),
+        ],
+      ),
     );
-
-    final end = center + direction * (power * 0.55);
-
-    canvas.drawLine(
-      center,
-      end,
-      Paint()
-        ..color = neon
-        ..strokeWidth = 3
-        ..strokeCap = StrokeCap.round,
-    );
-
-    canvas.drawLine(
-      end,
-      end + Offset(spin.dx * 12, spin.dy * 12),
-      Paint()
-        ..color = Colors.orange
-        ..strokeWidth = 2,
-    );
-
-    canvas.drawCircle(
-      center,
-      5,
-      Paint()..color = Colors.white,
-    );
+    controller.dispose();
   }
 
   @override
-  bool shouldRepaint(covariant AimPainter oldDelegate) =>
-      oldDelegate.angle != angle ||
-      oldDelegate.power != power ||
-      oldDelegate.spin != spin;
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          Box(
+            child: Column(
+              children: [
+                const Text('رصيد نقاط تجريبي'),
+                Text('${points.toStringAsFixed(2)} نقطة',
+                    style: const TextStyle(
+                        color: gold, fontSize: 30, fontWeight: FontWeight.bold)),
+                const Text('غير قابل للتحويل إلى أموال'),
+              ],
+            ),
+          ),
+          Row(
+            children: [
+              Expanded(
+                child: FilledButton(
+                  onPressed: () => showRequest(context, 'إضافة نقاط'),
+                  child: const Text('إضافة نقاط'),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: OutlinedButton(
+                  onPressed: () => showRequest(context, 'إزالة نقاط'),
+                  child: const Text('إزالة نقاط'),
+                ),
+              ),
+            ],
+          ),
+          const Heading('طلبات المحفظة'),
+          if (requests.isEmpty) const Text('لا توجد طلبات'),
+          ...requests.reversed.map((r) => ListTile(
+                title: Text('${r.type} • ${r.amount}'),
+                subtitle: Text(r.processed
+                    ? (r.accepted ? 'مقبول' : 'مرفوض')
+                    : 'قيد المراجعة'),
+                leading: Icon(Icons.circle,
+                    color: r.processed
+                        ? (r.accepted ? Colors.green : Colors.red)
+                        : gold),
+              )),
+        ],
+      );
+}
+
+// لوحة إدارة الطلبات
+class AdminPage extends StatelessWidget {
+  const AdminPage({
+    super.key,
+    required this.requests,
+    required this.onAccept,
+    required this.onReject,
+  });
+
+  final List<WalletRequest> requests;
+  final void Function(WalletRequest) onAccept, onReject;
+
+  @override
+  Widget build(BuildContext context) => ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Heading('لوحة الإدارة التجريبية'),
+          const Text('هذه لوحة محلية تجريبية وليست محمية'),
+          if (requests.where((r) => !r.processed).isEmpty)
+            const Box(child: Text('لا توجد طلبات معلقة')),
+          ...requests
+              .where((r) => !r.processed)
+              .map((r) => Box(
+                    child: Column(
+                      children: [
+                        Text(r.type),
+                        Text('${r.amount} نقطة'),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: FilledButton(
+                                onPressed: () => onAccept(r),
+                                child: const Text('قبول'),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: OutlinedButton(
+                                onPressed: () => onReject(r),
+                                child: const Text('رفض'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  )),
+        ],
+      );
+}
+
+// لعبة Sky Run
+class SkyGame extends StatefulWidget {
+  const SkyGame({super.key});
+
+  @override
+  State<SkyGame> createState() => _SkyGameState();
+}
+
+class _SkyGameState extends State<SkyGame> {
+  int score = 0;
+  bool running = false;
+
+  @override
+  Widget build(BuildContext context) => GameScreen('Sky Run', [
+        const Icon(Icons.flight, color: gold, size: 85),
+        Text('النقاط: $score',
+            style: const TextStyle(color: gold, fontSize: 30)),
+        Text(running ? 'الجولة بدأت' : 'ابدأ اللعب'),
+        FilledButton(
+          onPressed: () => setState(() => running = !running),
+          child: Text(running ? 'إيقاف' : 'ابدأ'),
+        ),
+        if (running)
+          FilledButton(
+            onPressed: () => setState(() => score += Random().nextInt(10) + 1),
+            child: const Text('اجمع نقاط'),
+          ),
+        TextButton(
+          onPressed: () => setState(() {
+            score = 0;
+            running = false;
+          }),
+          child: const Text('إعادة'),
+        ),
+      ]);
+}
+
+// لعبة Kamikaze
+class GridGame extends StatefulWidget {
+  const GridGame({super.key});
+
+  @override
+  State<GridGame> createState() => _GridGameState();
+}
+
+class _GridGameState extends State<GridGame> {
+  final safe = <int>{};
+  final opened = <int>{};
+  int level = 1, score = 0;
+  bool lost = false;
+
+  void resetBoard() {
+    final cells = List.generate(25, (i) => i)..shuffle();
+    safe
+      ..clear()
+      ..addAll(cells.take(18));
+    opened.clear();
+    lost = false;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    resetBoard();
+  }
+
+  @override
+  Widget build(BuildContext context) => GameScreen('Kamikaze Grid', [
+        Text('المستوى $level • النقاط $score',
+            style: const TextStyle(color: gold)),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 25,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 5,
+            crossAxisSpacing: 5,
+            mainAxisSpacing: 5,
+          ),
+          itemBuilder: (context, i) => InkWell(
+            onTap: lost || opened.contains(i)
+                ? null
+                : () => setState(() {
+                      opened.add(i);
+                      if (safe.contains(i)) {
+                        score += 5 * level;
+                        if (opened.length >= 5) {
+                          level++;
+                          resetBoard();
+                        }
+                      } else {
+                        lost = true;
+                      }
+                    }),
+            child: Container(
+              decoration: BoxDecoration(
+                color: opened.contains(i)
+                    ? (safe.contains(i) ? Colors.green : Colors.red)
+                    : panel,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Icon(
+                opened.contains(i)
+                    ? (safe.contains(i) ? Icons.star : Icons.close)
+                    : Icons.help_outline,
+                color: gold,
+              ),
+            ),
+          ),
+        ),
+        Text(lost ? 'انتهى المستوى' : 'اختر الخانات'),
+        FilledButton(
+          onPressed: () => setState(resetBoard),
+          child: const Text('إعادة اللعب'),
+        ),
+      ]);
+}
+
+// لعبة Mines
+class MinesGame extends StatefulWidget {
+  const MinesGame({super.key});
+
+  @override
+  State<MinesGame> createState() => _MinesGameState();
+}
+
+class _MinesGameState extends State<MinesGame> {
+  final bombs = <int>{2, 7, 14, 18, 23};
+  final opened = <int>{};
+  int score = 0;
+  bool over = false;
+
+  @override
+  Widget build(BuildContext context) => GameScreen('Mines Puzzle', [
+        Text('النقاط: $score', style: const TextStyle(color: gold)),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 25,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 5,
+            crossAxisSpacing: 5,
+            mainAxisSpacing: 5,
+          ),
+          itemBuilder: (context, i) => InkWell(
+            onTap: over || opened.contains(i)
+                ? null
+                : () => setState(() {
+                      opened.add(i);
+                      if (bombs.contains(i)) {
+                        over = true;
+                      } else {
+                        score += 2;
+                      }
+                    }),
+            child: Container(
+              decoration: BoxDecoration(
+                  color: panel, borderRadius: BorderRadius.circular(8)),
+              child: Icon(
+                opened.contains(i)
+                    ? (bombs.contains(i) ? Icons.bomb : Icons.check)
+                    : Icons.question_mark,
+                color: gold,
+              ),
+            ),
+          ),
+        ),
+        Text(over ? 'انتهت الجولة' : 'افتح الخانات'),
+        FilledButton(
+          onPressed: () => setState(() {
+            opened.clear();
+            score = 0;
+            over = false;
+          }),
+          child: const Text('لعبة جديدة'),
+        ),
+      ]);
+}
+
+// عجلة الحظ
+class WheelGame extends StatefulWidget {
+  const WheelGame({super.key});
+
+  @override
+  State<WheelGame> createState() => _WheelGameState();
+}
+
+class _WheelGameState extends State<WheelGame> {
+  String result = 'دور العجلة';
+  final options = ['2 نقطة', '5 نقاط', '10 نقاط', 'حاول مرة أخرى', '15 نقطة'];
+
+  @override
+  Widget build(BuildContext context) => GameScreen('Lucky Wheel', [
+        const Icon(Icons.casino, color: gold, size: 100),
+        Text(result, style: const TextStyle(color: gold, fontSize: 25)),
+        FilledButton(
+          onPressed: () =>
+              setState(() => result = options[Random().nextInt(options.length)]),
+          child: const Text('دور'),
+        ),
+      ]);
+}
+
+// لعبة High / Low
+class HighLowGame extends StatefulWidget {
+  const HighLowGame({super.key});
+
+  @override
+  State<HighLowGame> createState() => _HighLowGameState();
+}
+
+class _HighLowGameState extends State<HighLowGame> {
+  int value = Random().nextInt(13) + 1;
+  int score = 0;
+  String message = '';
+
+  void guess(bool higher) {
+    final next = Random().nextInt(13) + 1;
+    final correct = higher ? next > value : next < value;
+    setState(() {
+      message = correct ? 'صحيح!' : 'خطأ';
+      if (correct) score += 5;
+      value = next;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) => GameScreen('High / Low', [
+        Text('النقاط: $score', style: const TextStyle(color: gold)),
+        Box(child: Text('بطاقتك: $value', style: const TextStyle(fontSize: 30))),
+        Text(message),
+        Row(
+          children: [
+            Expanded(
+              child: FilledButton(
+                onPressed: () => guess(true),
+                child: const Text('أعلى'),
+              ),
+            ),
+            const SizedBox(width: 8),
+            Expanded(
+              child: FilledButton(
+                onPressed: () => guess(false),
+                child: const Text('أقل'),
+              ),
+            ),
+          ],
+        ),
+        TextButton(
+          onPressed: () => setState(() {
+            value = Random().nextInt(13) + 1;
+            score = 0;
+            message = '';
+          }),
+          child: const Text('إعادة'),
+        ),
+      ]);
+}
+
+// مكونات عامة
+class GameScreen extends StatelessWidget {
+  const GameScreen(this.title, this.children, {super.key});
+  final String title;
+  final List<Widget> children;
+
+  @override
+  Widget build(BuildContext context) => Scaffold(
+        appBar: AppBar(title: Text(title)),
+        body: ListView(
+          padding: const EdgeInsets.all(16),
+          children: children,
+        ),
+      );
+}
+
+class Box extends StatelessWidget {
+  const Box({super.key, required this.child});
+  final Widget child;
+
+  @override
+  Widget build(BuildContext context) => Container(
+        margin: const EdgeInsets.symmetric(vertical: 6),
+        padding: const EdgeInsets.all(14),
+        decoration:
+            BoxDecoration(color: panel, borderRadius: BorderRadius.circular(12)),
+        child: child,
+      );
+}
+
+class Heading extends StatelessWidget {
+  const Heading(this.text, {super.key});
+  final String text;
+
+  @override
+  Widget build(BuildContext context) => Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Text(text,
+            style: const TextStyle(
+                color: gold, fontSize: 20, fontWeight: FontWeight.bold)),
+      );
+}
+
+class GameTile extends StatelessWidget {
+  const GameTile(this.title, this.subtitle, this.icon, this.onTap, {super.key});
+  final String title, subtitle;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) => Box(
+        child: ListTile(
+          onTap: onTap,
+          leading: Icon(icon, color: gold, size: 30),
+          title: Text(title),
+          subtitle: Text(subtitle),
+          trailing: const Icon(Icons.chevron_right, color: gold),
+        ),
+      );
 }
