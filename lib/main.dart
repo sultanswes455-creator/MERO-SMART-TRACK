@@ -1,8 +1,9 @@
+
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_overlay_window/flutter_overlay_window.dart';
 
-const green = Color(0xFF00F58A);
+const neon = Color(0xFF00F58A);
 const dark = Color(0xFF080D0A);
 
 void main() {
@@ -25,13 +26,94 @@ class SnakApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      title: 'SNAK TRAINING',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         scaffoldBackgroundColor: dark,
-        colorScheme: const ColorScheme.dark(primary: green),
+        colorScheme: const ColorScheme.dark(primary: neon),
       ),
-      home: const HomePage(),
+      home: const ActivationPage(),
+    );
+  }
+}
+
+class ActivationPage extends StatefulWidget {
+  const ActivationPage({super.key});
+
+  @override
+  State<ActivationPage> createState() => _ActivationPageState();
+}
+
+class _ActivationPageState extends State<ActivationPage> {
+  final code = TextEditingController();
+  String error = '';
+
+  void activate() {
+    if (code.text.trim() == '3111') {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const HomePage()),
+      );
+    } else {
+      setState(() => error = 'كود التفعيل غير صحيح');
+    }
+  }
+
+  @override
+  void dispose() {
+    code.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(25),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.sports_esports,
+                  color: neon, size: 75),
+              const SizedBox(height: 20),
+              const Text('SNAK TRAINING',
+                  style: TextStyle(
+                    color: neon,
+                    fontSize: 26,
+                    fontWeight: FontWeight.bold,
+                  )),
+              const SizedBox(height: 25),
+              TextField(
+                controller: code,
+                obscureText: true,
+                keyboardType: TextInputType.number,
+                textAlign: TextAlign.center,
+                decoration: InputDecoration(
+                  hintText: 'أدخل كود التفعيل',
+                  errorText: error.isEmpty ? null : error,
+                  filled: true,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+                onSubmitted: (_) => activate(),
+              ),
+              const SizedBox(height: 15),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: activate,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: neon,
+                    foregroundColor: Colors.black,
+                  ),
+                  child: const Text('دخول'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }
@@ -44,11 +126,11 @@ class HomePage extends StatefulWidget {
 }
 
 class _HomePageState extends State<HomePage> {
-  String status = 'النافذة العائمة متوقفة';
+  String status = 'جاهز للتشغيل';
 
-  Future<void> startOverlay() async {
+  Future<void> start() async {
     try {
-      var allowed =
+      bool allowed =
           await FlutterOverlayWindow.isPermissionGranted();
 
       if (!allowed) {
@@ -57,105 +139,71 @@ class _HomePageState extends State<HomePage> {
       }
 
       if (!allowed) {
-        setState(() {
-          status = 'لم يتم منح إذن الظهور فوق التطبيقات';
-        });
+        setState(() => status = 'يجب منح إذن الظهور فوق التطبيقات');
         return;
       }
 
       await FlutterOverlayWindow.showOverlay(
-        height: 280,
-        width: 300,
+        height: 390,
+        width: 320,
         enableDrag: true,
         overlayTitle: 'SNAK TRAINING',
-        overlayContent: 'أدوات تدريب يدوية',
+        overlayContent: 'مساعد تدريب 8 Ball Pool',
       );
 
-      setState(() {
-        status = 'تم طلب تشغيل النافذة العائمة';
-      });
-    } catch (e) {
-      setState(() {
-        status = 'تعذر تشغيل النافذة. تحقق من إعداد Android.';
-      });
+      setState(() => status = 'تم تشغيل النافذة العائمة');
+    } catch (_) {
+      setState(() => status = 'تعذر تشغيل النافذة');
     }
   }
 
-  Future<void> stopOverlay() async {
+  Future<void> stop() async {
     await FlutterOverlayWindow.closeOverlay();
-    setState(() {
-      status = 'تم إيقاف النافذة العائمة';
-    });
+    setState(() => status = 'تم إيقاف النافذة');
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'SNAK TRAINING',
-          style: TextStyle(
-            color: green,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
+        title: const Text('SNAK TRAINING',
+            style: TextStyle(color: neon)),
         centerTitle: true,
-        backgroundColor: const Color(0xFF101A13),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(20),
-        children: [
-          const Icon(
-            Icons.sports_esports,
-            color: green,
-            size: 66,
-          ),
-          const SizedBox(height: 12),
-          const Text(
-            'مساعد تدريب 8 Ball Pool',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 21,
-              fontWeight: FontWeight.bold,
+      body: Padding(
+        padding: const EdgeInsets.all(22),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.sports_esports,
+                color: neon, size: 75),
+            const SizedBox(height: 20),
+            const Text('مساعد تدريب 8 Ball Pool',
+                style: TextStyle(fontSize: 21)),
+            const SizedBox(height: 25),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: start,
+                icon: const Icon(Icons.play_arrow),
+                label: const Text('تشغيل النافذة العائمة'),
+                style: FilledButton.styleFrom(
+                  backgroundColor: neon,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.all(16),
+                ),
+              ),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'أدوات يدوية لحساب زاوية وقوة الضربة.',
-            textAlign: TextAlign.center,
-            style: TextStyle(color: Colors.white60),
-          ),
-          const SizedBox(height: 28),
-          FilledButton.icon(
-            onPressed: startOverlay,
-            icon: const Icon(Icons.open_in_new),
-            label: const Text('تشغيل النافذة العائمة'),
-            style: FilledButton.styleFrom(
-              backgroundColor: green,
-              foregroundColor: Colors.black,
-              padding: const EdgeInsets.all(16),
+            const SizedBox(height: 12),
+            OutlinedButton.icon(
+              onPressed: stop,
+              icon: const Icon(Icons.close),
+              label: const Text('إيقاف النافذة'),
             ),
-          ),
-          const SizedBox(height: 12),
-          OutlinedButton.icon(
-            onPressed: stopOverlay,
-            icon: const Icon(Icons.close),
-            label: const Text('إيقاف النافذة العائمة'),
-          ),
-          const SizedBox(height: 22),
-          Container(
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: const Color(0xFF142019),
-              borderRadius: BorderRadius.circular(14),
-            ),
-            child: Text(
-              status,
-              textAlign: TextAlign.center,
-              style: const TextStyle(color: green),
-            ),
-          ),
-        ],
+            const SizedBox(height: 20),
+            Text(status, style: const TextStyle(color: neon)),
+          ],
+        ),
       ),
     );
   }
@@ -171,14 +219,12 @@ class TrainingOverlay extends StatefulWidget {
 class _TrainingOverlayState extends State<TrainingOverlay> {
   double angle = 45;
   double power = 65;
+  Offset spin = const Offset(0, 0);
   bool expanded = true;
+  bool showLines = true;
 
   @override
   Widget build(BuildContext context) {
-    final radians = angle * math.pi / 180;
-    final x = math.cos(radians) * power;
-    final y = math.sin(radians) * power;
-
     return Material(
       color: Colors.transparent,
       child: Align(
@@ -188,7 +234,7 @@ class _TrainingOverlayState extends State<TrainingOverlay> {
           padding: const EdgeInsets.all(12),
           decoration: BoxDecoration(
             color: const Color(0xF20A120D),
-            border: Border.all(color: green, width: 1.5),
+            border: Border.all(color: neon, width: 1.5),
             borderRadius: BorderRadius.circular(18),
           ),
           child: Column(
@@ -196,59 +242,114 @@ class _TrainingOverlayState extends State<TrainingOverlay> {
             children: [
               Row(
                 children: [
-                  const Icon(Icons.circle, color: green, size: 14),
+                  const Icon(Icons.circle, color: neon, size: 12),
                   const SizedBox(width: 8),
                   const Expanded(
-                    child: Text(
-                      'SNAK • تدريب',
-                      style: TextStyle(
-                        color: green,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+                    child: Text('SNAK TRAINING',
+                        style: TextStyle(
+                          color: neon,
+                          fontWeight: FontWeight.bold,
+                        )),
                   ),
                   IconButton(
-                    onPressed: () {
-                      setState(() => expanded = !expanded);
-                    },
+                    onPressed: () =>
+                        setState(() => expanded = !expanded),
                     icon: Icon(
-                      expanded ? Icons.expand_less : Icons.expand_more,
-                      color: Colors.white,
+                      expanded
+                          ? Icons.expand_less
+                          : Icons.expand_more,
                     ),
                   ),
                   IconButton(
-                    onPressed: () {
-                      FlutterOverlayWindow.closeOverlay();
-                    },
-                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () =>
+                        FlutterOverlayWindow.closeOverlay(),
+                    icon: const Icon(Icons.close),
                   ),
                 ],
               ),
               if (expanded) ...[
-                Text(
-                  'زاوية: ${angle.round()}°',
-                  style: const TextStyle(color: Colors.white),
-                ),
+                Text('زاوية التصويب: ${angle.round()}°'),
                 Slider(
                   value: angle,
                   min: 0,
                   max: 360,
                   onChanged: (v) => setState(() => angle = v),
                 ),
-                Text(
-                  'القوة: ${power.round()}%',
-                  style: const TextStyle(color: Colors.white),
-                ),
+                Text('قوة الضربة: ${power.round()}%'),
                 Slider(
                   value: power,
                   min: 1,
                   max: 100,
                   onChanged: (v) => setState(() => power = v),
                 ),
+                const SizedBox(height: 8),
+                const Text('مؤشر السبين',
+                    style: TextStyle(color: neon)),
+                GestureDetector(
+                  onPanUpdate: (details) {
+                    setState(() {
+                      spin = Offset(
+                        (spin.dx + details.delta.dx / 45)
+                            .clamp(-1.0, 1.0),
+                        (spin.dy + details.delta.dy / 45)
+                            .clamp(-1.0, 1.0),
+                      );
+                    });
+                  },
+                  child: Container(
+                    width: 105,
+                    height: 105,
+                    decoration: const BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white,
+                    ),
+                    child: Stack(
+                      children: [
+                        const Center(
+                          child: CircleAvatar(
+                            radius: 4,
+                            backgroundColor: Colors.black26,
+                          ),
+                        ),
+                        Positioned(
+                          left: 50 + spin.dx * 40 - 6,
+                          top: 50 + spin.dy * 40 - 6,
+                          child: const CircleAvatar(
+                            radius: 6,
+                            backgroundColor: Colors.red,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 8),
                 Text(
-                  'اتجاه تدريبي: X ${x.toStringAsFixed(1)} • Y ${y.toStringAsFixed(1)}',
+                  'السبين X: ${spin.dx.toStringAsFixed(2)}'
+                  '  Y: ${spin.dy.toStringAsFixed(2)}',
+                  style: const TextStyle(color: neon, fontSize: 11),
+                ),
+                SwitchListTile(
+                  dense: true,
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('إظهار خطوط المسار'),
+                  value: showLines,
+                  activeColor: neon,
+                  onChanged: (v) =>
+                      setState(() => showLines = v),
+                ),
+                if (showLines)
+                  CustomPaint(
+                    size: const Size(250, 95),
+                    painter: PathPainter(angle, power, spin),
+                  ),
+                const Text(
+                  'المسارات المعروضة تجريبية وليست كشفاً تلقائياً للكرات.',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: green, fontSize: 12),
+                  style: TextStyle(
+                    color: Colors.white54,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ],
@@ -256,5 +357,65 @@ class _TrainingOverlayState extends State<TrainingOverlay> {
         ),
       ),
     );
+  }
+}
+
+class PathPainter extends CustomPainter {
+  final double angle;
+  final double power;
+  final Offset spin;
+
+  PathPainter(this.angle, this.power, this.spin);
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final center = Offset(size.width / 2, size.height / 2);
+    final radians = angle * math.pi / 180;
+    final length = power * 0.85;
+
+    final direction = Offset(
+      math.cos(radians),
+      -math.sin(radians),
+    );
+
+    final paint = Paint()
+      ..color = neon
+      ..strokeWidth = 3
+      ..strokeCap = StrokeCap.round;
+
+    canvas.drawLine(
+      center,
+      center + direction * length,
+      paint,
+    );
+
+    final secondPaint = Paint()
+      ..color = Colors.orange
+      ..strokeWidth = 2
+      ..strokeCap = StrokeCap.round;
+
+    final spinOffset = Offset(
+      spin.dx * 15,
+      spin.dy * 15,
+    );
+
+    canvas.drawLine(
+      center + direction * length,
+      center + direction * length + spinOffset,
+      secondPaint,
+    );
+
+    canvas.drawCircle(
+      center,
+      5,
+      Paint()..color = Colors.white,
+    );
+  }
+
+  @override
+  bool shouldRepaint(covariant PathPainter old) {
+    return old.angle != angle ||
+        old.power != power ||
+        old.spin != spin;
   }
 }
