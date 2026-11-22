@@ -16,10 +16,12 @@ const surface = Color(0xFF1B202B);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
   await Supabase.initialize(
     url: supabaseUrl,
     publishableKey: supabasePublishableKey,
   );
+
   runApp(const MeroBetApp());
 }
 
@@ -61,6 +63,7 @@ class AuthGate extends StatelessWidget {
         if (supabase.auth.currentSession != null) {
           return const MainScreen();
         }
+
         return const LoginPage();
       },
     );
@@ -210,11 +213,13 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int page = 0;
   late Future<bool> ownerFuture;
+  late Future<int> balanceFuture;
 
   @override
   void initState() {
     super.initState();
     ownerFuture = checkOwner();
+    balanceFuture = getBalance();
   }
 
   Future<bool> checkOwner() async {
@@ -232,6 +237,23 @@ class _MainScreenState extends State<MainScreen> {
     } catch (_) {
       return false;
     }
+  }
+
+  // الرصيد مخزن بالفلس: 1000 فلس = دينار واحد.
+  Future<int> getBalance() async {
+    final result = await supabase.rpc('mero_balance');
+
+    if (result == null) return 0;
+    if (result is num) return result.round();
+
+    return int.tryParse(result.toString()) ?? 0;
+  }
+
+  void openDeposit() {
+    setState(() {
+      page = 2;
+      balanceFuture = getBalance();
+    });
   }
 
   @override
@@ -284,6 +306,53 @@ class _MainScreenState extends State<MainScreen> {
         return Scaffold(
           appBar: AppBar(
             backgroundColor: surface,
+            leadingWidth: 145,
+            leading: Padding(
+              padding: const EdgeInsetsDirectional.only(
+                start: 8,
+                top: 6,
+                bottom: 6,
+              ),
+              child: OutlinedButton(
+                onPressed: openDeposit,
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: gold,
+                  side: const BorderSide(color: gold),
+                  padding: const EdgeInsets.symmetric(horizontal: 7),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                child: FutureBuilder<int>(
+                  future: balanceFuture,
+                  builder: (context, balanceSnapshot) {
+                    final fils = balanceSnapshot.data ?? 0;
+                    final jod = fils / 1000;
+
+                    return FittedBox(
+                      fit: BoxFit.scaleDown,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.add_circle_outline,
+                            size: 18,
+                          ),
+                          const SizedBox(width: 5),
+                          Text(
+                            'د.أ ${jod.toStringAsFixed(3)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ),
             title: const Text(
               'MERO BET',
               style: TextStyle(
@@ -291,6 +360,7 @@ class _MainScreenState extends State<MainScreen> {
                 fontWeight: FontWeight.bold,
               ),
             ),
+            centerTitle: true,
           ),
           body: IndexedStack(
             index: page,
@@ -301,7 +371,12 @@ class _MainScreenState extends State<MainScreen> {
             selectedIndex: page,
             indicatorColor: gold.withOpacity(0.2),
             onDestinationSelected: (value) {
-              setState(() => page = value);
+              setState(() {
+                page = value;
+                if (value == 2) {
+                  balanceFuture = getBalance();
+                }
+              });
             },
             destinations: destinations,
           ),
