@@ -4,6 +4,7 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'betting.dart';
 import 'admin.dart';
 import 'wallet.dart';
+import 'chicken_road.dart';
 
 const supabaseUrl = 'https://gisiwcwellmuargvijuu.supabase.co';
 const supabasePublishableKey =
@@ -15,12 +16,10 @@ const surface = Color(0xFF1B202B);
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
   await Supabase.initialize(
     url: supabaseUrl,
     publishableKey: supabasePublishableKey,
   );
-
   runApp(const MeroBetApp());
 }
 
@@ -83,8 +82,7 @@ class _LoginPageState extends State<LoginPage> {
   bool loading = false;
 
   Future<void> submit() async {
-    if (email.text.trim().isEmpty ||
-        password.text.length < 6) {
+    if (email.text.trim().isEmpty || password.text.length < 6) {
       message('أدخل البريد وكلمة مرور من 6 أحرف على الأقل');
       return;
     }
@@ -350,14 +348,13 @@ class CasinoPage extends StatelessWidget {
                 fontSize: 18,
               ),
             ),
-            subtitle: const Text(
-              '20 خطوة • مخاطرة متوسطة',
-            ),
+            subtitle: const Text('20 خطوة • مخاطرة متوسطة'),
             trailing: const Icon(Icons.arrow_forward_ios),
             onTap: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(
-                  content: Text('لعبة Chicken Road قيد تجهيز واجهتها وربطها'),
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const ChickenRoadPage(),
                 ),
               );
             },
