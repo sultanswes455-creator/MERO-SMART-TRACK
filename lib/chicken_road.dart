@@ -73,9 +73,11 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
         currentStep = number(result['current_step']).toInt();
         multiplier = number(result['multiplier'], 1);
         payout = number(result['potential_return']);
+
         if (payout <= 0 && currentStep > 0) {
           payout = stake * multiplier;
         }
+
         gameOver = false;
         won = false;
         message = 'لديك جولة سابقة مستمرة. يمكنك المتابعة أو السحب.';
@@ -149,7 +151,10 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
       if (!mounted) return;
 
       setState(() {
-        currentStep = number(data['step'], currentStep).toInt();
+        currentStep = number(
+          data['step'],
+          currentStep.toDouble(),
+        ).toInt();
 
         if (status == 'lost' || data['success'] == false) {
           gameOver = true;
