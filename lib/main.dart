@@ -1,14 +1,27 @@
 
 import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-void main() {
+const supabaseUrl = 'https://gisiwcwellmuargvijuu.supabase.co';
+const supabasePublishableKey =
+    'sb_publishable_LFnn8cN7azC0Rl7RTbI_fQ_lVw8zRlc';
+
+const gold = Color(0xFFFFC928);
+const background = Color(0xFF10131B);
+const surface = Color(0xFF1B202B);
+
+Future<void> main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  await Supabase.initialize(
+    url: supabaseUrl,
+    publishableKey: supabasePublishableKey,
+  );
+
   runApp(const MeroBetApp());
 }
 
-const Color gold = Color(0xFFFFC928);
-const Color background = Color(0xFF10131B);
-const Color surface = Color(0xFF1B202B);
-const Color muted = Color(0xFF9299A8);
+final supabase = Supabase.instance.client;
 
 class MeroBetApp extends StatelessWidget {
   const MeroBetApp({super.key});
@@ -27,63 +40,168 @@ class MeroBetApp extends StatelessWidget {
         ),
         useMaterial3: true,
       ),
-      home: const MainScreen(),
+      home: const Directionality(
+        textDirection: TextDirection.rtl,
+        child: AuthGate(),
+      ),
     );
   }
 }
 
-class Match {
-  final String sport;
-  final String league;
-  final String home;
-  final String away;
-  final String time;
-  final List<String> odds;
+class AuthGate extends StatelessWidget {
+  const AuthGate({super.key});
 
-  const Match({
-    required this.sport,
-    required this.league,
-    required this.home,
-    required this.away,
-    required this.time,
-    required this.odds,
-  });
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<AuthState>(
+      stream: supabase.auth.onAuthStateChange,
+      builder: (context, snapshot) {
+        if (supabase.auth.currentSession != null) {
+          return const MainScreen();
+        }
+        return const LoginPage();
+      },
+    );
+  }
 }
 
-const List<Match> matches = [
-  Match(
-    sport: 'كرة القدم',
-    league: 'الدوري الإنجليزي',
-    home: 'مانشستر سيتي',
-    away: 'ليفربول',
-    time: 'اليوم - 20:00',
-    odds: ['1.85', '3.40', '2.10'],
-  ),
-  Match(
-    sport: 'كرة القدم',
-    league: 'الدوري الإسباني',
-    home: 'ريال مدريد',
-    away: 'برشلونة',
-    time: 'اليوم - 22:00',
-    odds: ['2.05', '3.20', '1.90'],
-  ),
-  Match(
-    sport: 'كرة السلة',
-    league: 'NBA',
-    home: 'Lakers',
-    away: 'Warriors',
-    time: 'غداً - 03:00',
-    odds: ['1.75', '2.05', ''],
-  ),
-  Match(
-    sport: 'التنس',
-    league: 'بطولة دولية',
-    home: 'Player A',
-    away: 'Player B',
-    time: 'غداً - 17:00',
-    odds: ['1.65', '2.20', ''],
-  ),
-];
+class LoginPage extends StatefulWidget {
+  const LoginPage({super.key});
+
+  @override
+  State<LoginPage> createState() => _LoginPageState();
+}
+
+class _LoginPageState extends State<LoginPage> {
+  final email = TextEditingController();
+  final password = TextEditingController();
+  bool isRegister = false;
+  bool loading = false;
+
+  Future<void> submit() async {
+    if (email.text.trim().isEmpty || password.text.length < 6) {
+      message('أدخل البريد وكلمة مرور من 6 أحرف على الأقل');
+      return;
+    }
+
+    setState(() => loading = true);
+    try {
+      if (isRegister) {
+        final result = await supabase.auth.signUp(
+          email: email.text.trim(),
+          password: password.text,
+        );
+
+        if (result.session == null && mounted) {
+          message('تم إنشاء الحساب. تحقق من بريدك لتأكيد التسجيل.');
+        }
+      } else {
+        await supabase.auth.signInWithPassword(
+          email: email.text.trim(),
+          password: password.text,
+        );
+      }
+    } on AuthException catch (e) {
+      message(e.message);
+    } catch (e) {
+      message('حدث خطأ أثناء الاتصال: $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  void message(String value) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(value)),
+    );
+  }
+
+  @override
+  void dispose() {
+    email.dispose();
+    password.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      body: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              const Icon(Icons.sports_soccer, color: gold, size: 65),
+              const SizedBox(height: 12),
+              const Text(
+                'MERO BET',
+                style: TextStyle(
+                  color: gold,
+                  fontSize: 32,
+                  fontWeight: FontWeight.w900,
+                ),
+              ),
+              const SizedBox(height: 30),
+              Text(
+                isRegister ? 'إنشاء حساب جديد' : 'تسجيل الدخول',
+                style: const TextStyle(fontSize: 22),
+              ),
+              const SizedBox(height: 20),
+              TextField(
+                controller: email,
+                keyboardType: TextInputType.emailAddress,
+                decoration: const InputDecoration(
+                  labelText: 'البريد الإلكتروني',
+                  prefixIcon: Icon(Icons.email_outlined),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: password,
+                obscureText: true,
+                decoration: const InputDecoration(
+                  labelText: 'كلمة المرور',
+                  prefixIcon: Icon(Icons.lock_outline),
+                  border: OutlineInputBorder(),
+                ),
+              ),
+              const SizedBox(height: 20),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: loading ? null : submit,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: gold,
+                    foregroundColor: Colors.black,
+                    padding: const EdgeInsets.all(15),
+                  ),
+                  child: Text(
+                    loading
+                        ? 'يرجى الانتظار...'
+                        : isRegister
+                            ? 'إنشاء الحساب'
+                            : 'دخول',
+                  ),
+                ),
+              ),
+              TextButton(
+                onPressed: () {
+                  setState(() => isRegister = !isRegister);
+                },
+                child: Text(
+                  isRegister
+                      ? 'لديك حساب؟ سجل الدخول'
+                      : 'ليس لديك حساب؟ أنشئ حساباً',
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -93,592 +211,209 @@ class MainScreen extends StatefulWidget {
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int selectedPage = 0;
-  int selectedSport = 0;
-  double demoBalance = 0;
-  final List<Map<String, String>> betSlip = [];
-  final List<String> requests = [];
-
-  final sports = ['الكل', 'كرة القدم', 'كرة السلة', 'التنس'];
-
-  void addSelection(Match match, String selection, String odd) {
-    setState(() {
-      betSlip.removeWhere((item) => item['match'] == '${match.home} - ${match.away}');
-      betSlip.add({
-        'match': '${match.home} - ${match.away}',
-        'selection': selection,
-        'odd': odd,
-      });
-    });
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('تمت إضافة الاختيار إلى قسيمة الرهان التجريبية')),
-    );
-  }
+  int page = 0;
 
   @override
   Widget build(BuildContext context) {
     final pages = [
-      homePage(),
-      sportsPage(),
-      gamesPage(),
-      walletPage(),
-      profilePage(),
+      const EventsPage(),
+      const WalletPage(),
+      const AccountPage(),
     ];
 
-    return Directionality(
-      textDirection: TextDirection.rtl,
-      child: Scaffold(
-        appBar: AppBar(
-          backgroundColor: surface,
-          title: const Text(
-            'MERO BET',
-            style: TextStyle(
-              color: gold,
-              fontWeight: FontWeight.w900,
-              letterSpacing: 1.5,
-            ),
-          ),
-          actions: [
-            IconButton(
-              onPressed: () => showMessage('الإشعارات'),
-              icon: const Icon(Icons.notifications_none),
-            ),
-            const SizedBox(width: 8),
-          ],
-        ),
-        body: pages[selectedPage],
-        bottomNavigationBar: NavigationBar(
-          backgroundColor: surface,
-          indicatorColor: gold.withOpacity(0.18),
-          selectedIndex: selectedPage,
-          onDestinationSelected: (index) {
-            setState(() => selectedPage = index);
-          },
-          destinations: const [
-            NavigationDestination(
-              icon: Icon(Icons.home_outlined),
-              selectedIcon: Icon(Icons.home, color: gold),
-              label: 'الرئيسية',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.sports_soccer),
-              label: 'الرياضة',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.sports_esports),
-              label: 'الألعاب',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.account_balance_wallet_outlined),
-              label: 'المحفظة',
-            ),
-            NavigationDestination(
-              icon: Icon(Icons.person_outline),
-              label: 'حسابي',
-            ),
-          ],
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: surface,
+        title: const Text(
+          'MERO BET',
+          style: TextStyle(color: gold, fontWeight: FontWeight.bold),
         ),
       ),
-    );
-  }
-
-  Widget homePage() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(18),
-            gradient: const LinearGradient(
-              colors: [Color(0xFF343044), Color(0xFF171D2A)],
-            ),
-          ),
-          child: const Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('مرحباً بك في', style: TextStyle(color: Colors.white70)),
-              SizedBox(height: 5),
-              Text(
-                'MERO BET',
-                style: TextStyle(
-                  fontSize: 30,
-                  fontWeight: FontWeight.w900,
-                  color: gold,
-                ),
-              ),
-              SizedBox(height: 8),
-              Text('منصتك الرياضية والترفيهية'),
-            ],
-          ),
-        ),
-        const SizedBox(height: 20),
-        sectionTitle('الرياضات'),
-        const SizedBox(height: 10),
-        sportsSelector(),
-        const SizedBox(height: 20),
-        sectionTitle('المباريات المتاحة'),
-        const SizedBox(height: 10),
-        ...matches.take(3).map(matchCard),
-        const SizedBox(height: 15),
-        sectionTitle('ألعاب المنصة'),
-        const SizedBox(height: 10),
-        gamesGrid(),
-        const SizedBox(height: 20),
-        sectionTitle('قسيمة الاختيارات'),
-        betSlipWidget(),
-      ],
-    );
-  }
-
-  Widget sportsPage() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        sectionTitle('المباريات والرياضات'),
-        const SizedBox(height: 15),
-        sportsSelector(),
-        const SizedBox(height: 15),
-        ...matches
-            .where((m) =>
-                selectedSport == 0 || m.sport == sports[selectedSport])
-            .map(matchCard),
-      ],
-    );
-  }
-
-  Widget sportsSelector() {
-    return SizedBox(
-      height: 42,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        itemCount: sports.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, index) {
-          final active = selectedSport == index;
-          return ChoiceChip(
-            label: Text(sports[index]),
-            selected: active,
-            selectedColor: gold,
-            labelStyle: TextStyle(
-              color: active ? Colors.black : Colors.white,
-              fontWeight: FontWeight.bold,
-            ),
-            onSelected: (_) => setState(() => selectedSport = index),
-          );
+      body: pages[page],
+      bottomNavigationBar: NavigationBar(
+        backgroundColor: surface,
+        selectedIndex: page,
+        indicatorColor: gold.withOpacity(0.2),
+        onDestinationSelected: (value) {
+          setState(() => page = value);
         },
-      ),
-    );
-  }
-
-  Widget matchCard(Match match) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 13),
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(15),
-        border: Border.all(color: Colors.white10),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.sports_soccer, color: gold, size: 18),
-              const SizedBox(width: 7),
-              Expanded(
-                child: Text(
-                  match.league,
-                  style: const TextStyle(color: muted, fontSize: 12),
-                ),
-              ),
-              Text(match.time,
-                  style: const TextStyle(color: gold, fontSize: 12)),
-            ],
+        destinations: const [
+          NavigationDestination(
+            icon: Icon(Icons.sports_soccer),
+            label: 'المباريات',
           ),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  match.home,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-              const Text('VS',
-                  style: TextStyle(color: gold, fontWeight: FontWeight.bold)),
-              Expanded(
-                child: Text(
-                  match.away,
-                  textAlign: TextAlign.center,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
-                ),
-              ),
-            ],
+          NavigationDestination(
+            icon: Icon(Icons.account_balance_wallet),
+            label: 'المحفظة',
           ),
-          const SizedBox(height: 15),
-          Row(
-            children: [
-              Expanded(child: oddButton(match, 'فوز ${match.home}', match.odds[0])),
-              const SizedBox(width: 7),
-              Expanded(child: oddButton(match, 'تعادل', match.odds[1])),
-              if (match.odds[2].isNotEmpty) ...[
-                const SizedBox(width: 7),
-                Expanded(child: oddButton(match, 'فوز ${match.away}', match.odds[2])),
-              ],
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'بيانات وأسعار تجريبية وليست احتمالات مباشرة.',
-            style: TextStyle(color: muted, fontSize: 10),
+          NavigationDestination(
+            icon: Icon(Icons.person),
+            label: 'حسابي',
           ),
         ],
       ),
     );
   }
+}
 
-  Widget oddButton(Match match, String selection, String odd) {
-    return InkWell(
-      onTap: () => addSelection(match, selection, odd),
-      child: Container(
-        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 3),
-        decoration: BoxDecoration(
-          color: background,
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: Colors.white12),
-        ),
-        child: Column(
-          children: [
-            Text(selection,
-                textAlign: TextAlign.center,
-                style: const TextStyle(fontSize: 10, color: muted)),
-            const SizedBox(height: 5),
-            Text(odd,
-                style: const TextStyle(
-                    color: gold, fontWeight: FontWeight.bold)),
-          ],
-        ),
-      ),
-    );
+class EventsPage extends StatelessWidget {
+  const EventsPage({super.key});
+
+  String eventName(Map<String, dynamic> row, List<String> keys) {
+    for (final key in keys) {
+      final value = row[key];
+      if (value != null && value.toString().isNotEmpty) {
+        return value.toString();
+      }
+    }
+    return '—';
   }
 
-  Widget gamesPage() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        sectionTitle('ألعاب MERO BET'),
-        const SizedBox(height: 8),
-        const Text(
-          'ألعاب ترفيهية تجريبية. لا تتضمن إيداعاً أو جوائز مالية.',
-          style: TextStyle(color: muted),
-        ),
-        const SizedBox(height: 15),
-        gamesGrid(),
-      ],
-    );
-  }
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: supabase.from('events').select(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
 
-  Widget gamesGrid() {
-    final games = [
-      ['عجلة الحظ', Icons.casino],
-      ['تحدي الأرقام', Icons.numbers],
-      ['اختبار السرعة', Icons.speed],
-      ['الذاكرة', Icons.psychology],
-      ['تخمين اللون', Icons.palette],
-      ['لعبة التركيز', Icons.center_focus_strong],
-      ['اختيار الصندوق', Icons.inventory_2],
-      ['تحدي الحساب', Icons.calculate],
-      ['لعبة الحروف', Icons.abc],
-      ['اختبار الحظ', Icons.stars],
-    ];
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('تعذر تحميل المباريات: ${snapshot.error}'),
+          );
+        }
 
-    return GridView.builder(
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      itemCount: games.length,
-      gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-        crossAxisCount: 2,
-        mainAxisSpacing: 10,
-        crossAxisSpacing: 10,
-        childAspectRatio: 1.5,
-      ),
-      itemBuilder: (context, index) {
-        return InkWell(
-          onTap: () => showGame(games[index][0] as String),
-          child: Container(
-            decoration: BoxDecoration(
-              color: surface,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: Colors.white10),
-            ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(games[index][1] as IconData, color: gold, size: 30),
-                const SizedBox(height: 8),
-                Text(
-                  games[index][0] as String,
-                  style: const TextStyle(fontWeight: FontWeight.bold),
+        final events = snapshot.data ?? [];
+
+        if (events.isEmpty) {
+          return const Center(
+            child: Text('لا توجد مباريات حالياً'),
+          );
+        }
+
+        return RefreshIndicator(
+          onRefresh: () async {
+            await supabase.from('events').select();
+          },
+          child: ListView.builder(
+            padding: const EdgeInsets.all(14),
+            itemCount: events.length,
+            itemBuilder: (context, index) {
+              final event = events[index];
+
+              final title = eventName(
+                event,
+                ['title', 'name', 'home_team', 'home_name'],
+              );
+              final away = eventName(
+                event,
+                ['away_team', 'away_name', 'opponent'],
+              );
+              final status = eventName(event, ['status']);
+
+              return Card(
+                color: surface,
+                margin: const EdgeInsets.only(bottom: 12),
+                child: ListTile(
+                  leading: const Icon(
+                    Icons.sports_soccer,
+                    color: gold,
+                  ),
+                  title: Text('$title  -  $away'),
+                  subtitle: Text('الحالة: $status'),
                 ),
-              ],
-            ),
+              );
+            },
           ),
         );
       },
     );
   }
+}
 
-  void showGame(String name) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: surface,
-        title: Text(name),
-        content: const Text(
-          'هذه نسخة أولية من اللعبة. يمكن إضافة آلية اللعب الكاملة في مرحلة تطوير الألعاب.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('إغلاق', style: TextStyle(color: gold)),
-          ),
-        ],
-      ),
-    );
+class WalletPage extends StatelessWidget {
+  const WalletPage({super.key});
+
+  Future<dynamic> getBalance() async {
+    return await supabase.rpc('mero_balance');
   }
 
-  Widget walletPage() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        sectionTitle('المحفظة'),
-        const SizedBox(height: 15),
-        Container(
-          padding: const EdgeInsets.all(22),
-          decoration: BoxDecoration(
-            color: surface,
-            borderRadius: BorderRadius.circular(16),
-          ),
-          child: Column(
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: FutureBuilder<dynamic>(
+        future: getBalance(),
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const CircularProgressIndicator();
+          }
+
+          if (snapshot.hasError) {
+            return Padding(
+              padding: const EdgeInsets.all(20),
+              child: Text('تعذر جلب الرصيد: ${snapshot.error}'),
+            );
+          }
+
+          final balance = snapshot.data ?? 0;
+
+          return Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Text('الرصيد التجريبي',
-                  style: TextStyle(color: muted)),
+              const Icon(
+                Icons.account_balance_wallet,
+                color: gold,
+                size: 55,
+              ),
+              const SizedBox(height: 15),
+              const Text('رصيد الحساب'),
               const SizedBox(height: 10),
               Text(
-                '${demoBalance.toStringAsFixed(2)} JOD',
+                '$balance JOD',
                 style: const TextStyle(
                   color: gold,
                   fontSize: 30,
                   fontWeight: FontWeight.bold,
                 ),
               ),
+              const SizedBox(height: 12),
+              const Text(
+                'طلبات الإيداع والسحب ستُربط في المرحلة التالية.',
+                textAlign: TextAlign.center,
+              ),
             ],
-          ),
-        ),
-        const SizedBox(height: 18),
-        actionTile('طلب إيداع', Icons.add_circle_outline, depositDialog),
-        actionTile('طلب سحب', Icons.remove_circle_outline, withdrawDialog),
-        const SizedBox(height: 20),
-        sectionTitle('طلبات المحفظة'),
-        const SizedBox(height: 10),
-        if (requests.isEmpty)
-          const Text('لا توجد طلبات حتى الآن.',
-              style: TextStyle(color: muted)),
-        ...requests.map(
-          (request) => ListTile(
-            leading: const Icon(Icons.receipt_long, color: gold),
-            title: Text(request),
-            subtitle: const Text('قيد المراجعة - طلب تجريبي'),
-          ),
-        ),
-        const SizedBox(height: 12),
-        const Text(
-          'هذه واجهة تجريبية فقط. لا يتم تنفيذ التحويلات أو اعتماد الأرصدة فعلياً.',
-          style: TextStyle(color: muted, fontSize: 11),
-        ),
-      ],
-    );
-  }
-
-  void depositDialog() {
-    requestDialog('طلب إيداع', true);
-  }
-
-  void withdrawDialog() {
-    requestDialog('طلب سحب', false);
-  }
-
-  void requestDialog(String title, bool isDeposit) {
-    final amount = TextEditingController();
-    final reference = TextEditingController();
-    String method = 'Orange Money';
-
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, refresh) => AlertDialog(
-          backgroundColor: surface,
-          title: Text(title),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                DropdownButtonFormField<String>(
-                  value: method,
-                  decoration: const InputDecoration(labelText: 'طريقة الدفع'),
-                  items: ['Orange Money', 'CliQ']
-                      .map((v) => DropdownMenuItem(value: v, child: Text(v)))
-                      .toList(),
-                  onChanged: (v) => refresh(() => method = v ?? method),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: amount,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: 'المبلغ بالدينار الأردني',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: reference,
-                  decoration: InputDecoration(
-                    labelText: isDeposit
-                        ? 'رقم مرجع التحويل'
-                        : 'رقم المحفظة أو الهاتف',
-                  ),
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إلغاء'),
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: gold,
-                foregroundColor: Colors.black,
-              ),
-              onPressed: () {
-                final value = double.tryParse(amount.text);
-                if (value == null || value <= 0 || reference.text.trim().isEmpty) {
-                  return;
-                }
-                setState(() {
-                  requests.add(
-                    '$title: ${value.toStringAsFixed(2)} JOD - $method',
-                  );
-                });
-                Navigator.pop(dialogContext);
-                showMessage('تم تسجيل الطلب التجريبي');
-              },
-              child: const Text('إرسال الطلب'),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
+}
 
-  Widget profilePage() {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const CircleAvatar(
-          radius: 42,
-          backgroundColor: surface,
-          child: Icon(Icons.person, color: gold, size: 45),
-        ),
-        const SizedBox(height: 15),
-        const Center(
-          child: Text(
-            'حساب المستخدم',
-            style: TextStyle(fontSize: 21, fontWeight: FontWeight.bold),
-          ),
-        ),
-        const SizedBox(height: 20),
-        actionTile('المعلومات الشخصية', Icons.person_outline,
-            () => showMessage('تسجيل الحساب يحتاج إلى إعداد الخادم')),
-        actionTile('سجل النشاطات', Icons.history,
-            () => showMessage('لا توجد نشاطات محفوظة')),
-        actionTile('الشروط والأحكام', Icons.description_outlined,
-            () => showMessage('سيتم إضافة الشروط والأحكام')),
-        actionTile('الدعم الفني', Icons.support_agent,
-            () => showMessage('الدعم الفني')),
-        actionTile('لوحة الإدارة', Icons.admin_panel_settings,
-            () => showMessage('لوحة الإدارة تحتاج إلى تسجيل دخول آمن للمالك')),
-      ],
-    );
-  }
+class AccountPage extends StatelessWidget {
+  const AccountPage({super.key});
 
-  Widget betSlipWidget() {
-    if (betSlip.isEmpty) {
-      return const Padding(
-        padding: EdgeInsets.all(15),
-        child: Text('لم تختر أي مباراة بعد.',
-            style: TextStyle(color: muted)),
-      );
-    }
+  @override
+  Widget build(BuildContext context) {
+    final user = supabase.auth.currentUser;
 
-    return Container(
-      padding: const EdgeInsets.all(13),
-      decoration: BoxDecoration(
-        color: surface,
-        borderRadius: BorderRadius.circular(14),
-      ),
+    return Center(
       child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          ...betSlip.map(
-            (item) => ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: Text(item['match'] ?? ''),
-              subtitle: Text(item['selection'] ?? ''),
-              trailing: Text(
-                item['odd'] ?? '',
-                style: const TextStyle(color: gold),
-              ),
-            ),
-          ),
-          OutlinedButton(
-            onPressed: () => setState(() => betSlip.clear()),
-            child: const Text('مسح القسيمة'),
-          ),
-          const Text(
-            'القسيمة للعرض التجريبي فقط ولا تنفذ رهانات حقيقية.',
-            style: TextStyle(color: muted, fontSize: 11),
+          const Icon(Icons.person, color: gold, size: 60),
+          const SizedBox(height: 12),
+          Text(user?.email ?? 'المستخدم'),
+          const SizedBox(height: 20),
+          ElevatedButton.icon(
+            onPressed: () async {
+              await supabase.auth.signOut();
+            },
+            icon: const Icon(Icons.logout),
+            label: const Text('تسجيل الخروج'),
           ),
         ],
       ),
-    );
-  }
-
-  Widget actionTile(String title, IconData icon, VoidCallback action) {
-    return Card(
-      color: surface,
-      child: ListTile(
-        leading: Icon(icon, color: gold),
-        title: Text(title),
-        trailing: const Icon(Icons.chevron_left, color: muted),
-        onTap: action,
-      ),
-    );
-  }
-
-  Widget sectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 19, fontWeight: FontWeight.bold),
-    );
-  }
-
-  void showMessage(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message)),
     );
   }
 }
