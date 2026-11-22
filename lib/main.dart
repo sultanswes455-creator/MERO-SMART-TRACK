@@ -241,14 +241,14 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  // الرصيد مخزن بالفلس: 1000 فلس = دينار واحد.
-  Future<int> getBalance() async {
+  // الرصيد مخزن بالدينار الأردني مباشرة.
+  Future<double> getBalance() async {
     final result = await supabase.rpc('mero_balance');
 
     if (result == null) return 0;
-    if (result is num) return result.round();
+    if (result is num) return result.toDouble();
 
-    return int.tryParse(result.toString()) ?? 0;
+    return double.tryParse(result.toString()) ?? 0;
   }
 
   void openDeposit() {
@@ -325,11 +325,10 @@ class _MainScreenState extends State<MainScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                 ),
-                child: FutureBuilder<int>(
+                child: FutureBuilder<double>(
                   future: balanceFuture,
                   builder: (context, balanceSnapshot) {
-                    final fils = balanceSnapshot.data ?? 0;
-                    final jod = fils / 1000;
+                    final jod = balanceSnapshot.data ?? 0.0;
 
                     return FittedBox(
                       fit: BoxFit.scaleDown,
