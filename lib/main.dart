@@ -410,8 +410,6 @@ class CasinoPage extends StatelessWidget {
           style: TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 20),
-
-        // لعبة Chicken Road
         Card(
           color: surface,
           child: ListTile(
@@ -439,10 +437,7 @@ class CasinoPage extends StatelessWidget {
             },
           ),
         ),
-
         const SizedBox(height: 12),
-
-        // لعبة KAMIKAZE
         Card(
           color: surface,
           child: ListTile(
