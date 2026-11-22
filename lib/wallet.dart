@@ -24,11 +24,11 @@ class _WalletPageState extends State<WalletPage> {
   String kind = 'deposit';
   bool loading = false;
 
-  Future<int> getBalance() async {
+  Future<double> getBalance() async {
     final result = await walletDb.rpc('mero_balance');
     if (result == null) return 0;
-    if (result is num) return result.round();
-    return int.tryParse(result.toString()) ?? 0;
+    if (result is num) return result.toDouble();
+    return double.tryParse(result.toString()) ?? 0;
   }
 
   void notify(String text) {
@@ -191,10 +191,10 @@ class _WalletPageState extends State<WalletPage> {
     return ListView(
       padding: const EdgeInsets.all(18),
       children: [
-        FutureBuilder<int>(
+        FutureBuilder<double>(
           future: getBalance(),
           builder: (context, snapshot) {
-            final fils = snapshot.data ?? 0;
+            final jod = snapshot.data ?? 0.0;
 
             return Card(
               color: const Color(0xFF1B202B),
@@ -205,7 +205,7 @@ class _WalletPageState extends State<WalletPage> {
                     const Text('رصيد محفظتك'),
                     const SizedBox(height: 8),
                     Text(
-                      '${(fils / 1000).toStringAsFixed(3)} د.أ',
+                      '${jod.toStringAsFixed(3)} د.أ',
                       style: const TextStyle(
                         color: Color(0xFFFFC928),
                         fontSize: 28,
