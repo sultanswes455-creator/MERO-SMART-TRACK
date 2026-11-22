@@ -1,10 +1,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
 import 'betting.dart';
 import 'admin.dart';
 import 'wallet.dart';
 import 'chicken_road.dart';
+import 'kamikaze.dart';
 
 const supabaseUrl = 'https://gisiwcwellmuargvijuu.supabase.co';
 const supabasePublishableKey =
@@ -408,6 +410,8 @@ class CasinoPage extends StatelessWidget {
           style: TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 20),
+
+        // لعبة Chicken Road
         Card(
           color: surface,
           child: ListTile(
@@ -430,6 +434,39 @@ class CasinoPage extends StatelessWidget {
                 context,
                 MaterialPageRoute(
                   builder: (context) => const ChickenRoadPage(),
+                ),
+              );
+            },
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // لعبة KAMIKAZE
+        Card(
+          color: surface,
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: const CircleAvatar(
+              backgroundColor: Colors.red,
+              child: Icon(Icons.flight, color: Colors.white),
+            ),
+            title: const Text(
+              'KAMIKAZE',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            subtitle: const Text(
+              '12 صفاً • 5 مربعات • اسحب في أي وقت',
+            ),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const KamikazePage(),
                 ),
               );
             },
