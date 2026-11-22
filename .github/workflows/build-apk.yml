@@ -1,5 +1,5 @@
 
-name: Build MERO PLAY APK
+name: Build MERO BET APK
 
 on:
   workflow_dispatch:
@@ -24,29 +24,11 @@ jobs:
           cache: true
 
       - name: Generate Android project
-        run: flutter create --platforms=android --project-name mero_play .
+        run: flutter create --platforms=android --project-name mero_bet .
 
-      - name: Configure Gradle repositories
+      - name: Set App Name
         run: |
-          mkdir -p "$HOME/.gradle"
-          cat > "$HOME/.gradle/init.gradle" <<'EOF'
-          allprojects {
-              repositories {
-                  google()
-                  mavenCentral()
-                  gradlePluginPortal()
-              }
-          }
-          settingsEvaluated { settings ->
-              settings.pluginManagement {
-                  repositories {
-                      google()
-                      mavenCentral()
-                      gradlePluginPortal()
-                  }
-              }
-          }
-          EOF
+          sed -i 's/android:label="[^"]*"/android:label="MERO BET"/' android/app/src/main/AndroidManifest.xml
 
       - name: Get dependencies
         run: flutter pub get
@@ -57,5 +39,5 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: mero-play-apk
+          name: mero-bet-apk
           path: build/app/outputs/flutter-apk/app-release.apk
