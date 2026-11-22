@@ -16,7 +16,6 @@ class _AdminPageState extends State<AdminPage>
     with SingleTickerProviderStateMixin {
   final db = Supabase.instance.client;
   late final TabController tabs;
-  bool loading = false;
 
   @override
   void initState() {
@@ -43,8 +42,10 @@ class _AdminPageState extends State<AdminPage>
     final home = TextEditingController();
     final away = TextEditingController();
     final date = TextEditingController(
-      text: DateTime.now().add(const Duration(days: 1))
-          .toIso8601String().substring(0, 16),
+      text: DateTime.now()
+          .add(const Duration(days: 1))
+          .toIso8601String()
+          .substring(0, 16),
     );
 
     final ok = await showDialog<bool>(
@@ -175,7 +176,9 @@ class _AdminPageState extends State<AdminPage>
 
     final value = double.tryParse(odds.text.trim());
     if (label.text.trim().isEmpty ||
-        value == null || value <= 1 || value > 1000) {
+        value == null ||
+        value <= 1 ||
+        value > 1000) {
       message('تحقق من الاسم والمعامل؛ يجب أن يكون أكبر من 1');
       return;
     }
@@ -195,13 +198,13 @@ class _AdminPageState extends State<AdminPage>
     }
   }
 
-  Future<void> setResult(
-      String selectionId, String result) async {
+  Future<void> setResult(String selectionId, String result) async {
     try {
       await db.from('selections').update({
         'result': result,
         'is_active': false,
       }).eq('id', selectionId);
+
       message('تم حفظ النتيجة');
       setState(() {});
     } catch (e) {
@@ -214,6 +217,7 @@ class _AdminPageState extends State<AdminPage>
       await db.from('events').update({
         'status': 'finished',
       }).eq('id', eventId);
+
       message('تم إنهاء المباراة');
       setState(() {});
     } catch (e) {
@@ -221,18 +225,22 @@ class _AdminPageState extends State<AdminPage>
     }
   }
 
-  Future<void> reviewRequest(
-      String id, bool approve) async {
+  Future<void> reviewRequest(String id, bool approve) async {
     try {
       await db.rpc(
         'mero_review_wallet_request',
         params: {
           'p_request_id': id,
           'p_approve': approve,
-          'p_note': approve ? 'تمت الموافقة' : 'تم الرفض',
         },
       );
-      message(approve ? 'تمت الموافقة على الطلب' : 'تم رفض الطلب');
+
+      message(
+        approve
+            ? 'تمت الموافقة على الطلب'
+            : 'تم رفض الطلب',
+      );
+
       setState(() {});
     } catch (e) {
       message('تعذر معالجة الطلب: $e');
@@ -245,6 +253,7 @@ class _AdminPageState extends State<AdminPage>
         'mero_settle_bet',
         params: {'p_bet_id': id},
       );
+
       message('تمت تسوية القسيمة');
       setState(() {});
     } catch (e) {
@@ -262,8 +271,14 @@ class _AdminPageState extends State<AdminPage>
             controller: tabs,
             labelColor: adminGold,
             tabs: const [
-              Tab(icon: Icon(Icons.sports_soccer), text: 'المباريات'),
-              Tab(icon: Icon(Icons.account_balance_wallet), text: 'طلبات المحفظة'),
+              Tab(
+                icon: Icon(Icons.sports_soccer),
+                text: 'المباريات',
+              ),
+              Tab(
+                icon: Icon(Icons.account_balance_wallet),
+                text: 'طلبات المحفظة',
+              ),
             ],
           ),
         ),
@@ -302,28 +317,41 @@ class _AdminPageState extends State<AdminPage>
           child: FutureBuilder<List<Map<String, dynamic>>>(
             future: db.from('events').select().order('starts_at'),
             builder: (context, snapshot) {
-              if (snapshot.connectionState == ConnectionState.waiting) {
-                return const Center(child: CircularProgressIndicator());
+              if (snapshot.connectionState ==
+                  ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(),
+                );
               }
+
               if (snapshot.hasError) {
-                return Center(child: Text('خطأ: ${snapshot.error}'));
+                return Center(
+                  child: Text('خطأ: ${snapshot.error}'),
+                );
               }
+
               final events = snapshot.data ?? [];
+
               if (events.isEmpty) {
-                return const Center(child: Text('لا توجد مباريات'));
+                return const Center(
+                  child: Text('لا توجد مباريات'),
+                );
               }
+
               return ListView.builder(
                 padding: const EdgeInsets.all(12),
                 itemCount: events.length,
                 itemBuilder: (context, index) {
                   final event = events[index];
                   final id = event['id'].toString();
+
                   return Card(
                     color: adminSurface,
                     child: Padding(
                       padding: const EdgeInsets.all(12),
                       child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        crossAxisAlignment:
+                            CrossAxisAlignment.stretch,
                         children: [
                           Text(
                             '${event['home_name']} × ${event['away_name']}',
@@ -332,13 +360,17 @@ class _AdminPageState extends State<AdminPage>
                               fontSize: 17,
                             ),
                           ),
-                          Text('${event['league']} • ${event['status']}'),
+                          Text(
+                            '${event['league']} • ${event['status']}',
+                          ),
                           Text('الموعد: ${event['starts_at']}'),
                           const SizedBox(height: 8),
                           OutlinedButton.icon(
                             onPressed: () => addMarket(id),
                             icon: const Icon(Icons.add),
-                            label: const Text('إضافة سوق للمباراة'),
+                            label: const Text(
+                              'إضافة سوق للمباراة',
+                            ),
                           ),
                           marketsForEvent(id),
                           if (event['status'] == 'upcoming' ||
@@ -362,15 +394,19 @@ class _AdminPageState extends State<AdminPage>
 
   Widget marketsForEvent(String eventId) {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: db.from('markets').select()
+      future: db
+          .from('markets')
+          .select()
           .eq('event_id', eventId),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const SizedBox.shrink();
         }
+
         return Column(
           children: snapshot.data!.map((market) {
             final marketId = market['id'].toString();
+
             return Container(
               margin: const EdgeInsets.only(top: 8),
               padding: const EdgeInsets.all(8),
@@ -402,21 +438,26 @@ class _AdminPageState extends State<AdminPage>
 
   Widget selectionsForMarket(String marketId) {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: db.from('selections').select()
+      future: db
+          .from('selections')
+          .select()
           .eq('market_id', marketId),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const SizedBox.shrink();
         }
+
         return Column(
           children: snapshot.data!.map((selection) {
             final id = selection['id'].toString();
             final result = selection['result'].toString();
+
             return Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  '${selection['label']}  |  ${selection['odds']}  |  $result',
+                  '${selection['label']}  |  '
+                  '${selection['odds']}  |  $result',
                 ),
                 if (result == 'pending')
                   Wrap(
@@ -446,40 +487,65 @@ class _AdminPageState extends State<AdminPage>
 
   Widget requestsTab() {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: db.from('wallet_requests')
-          .select('*, profiles(display_name)')
+      future: db
+          .from('wallet_requests')
+          .select(
+            '*, profiles!wallet_requests_user_id_fkey(display_name)',
+          )
           .eq('status', 'pending')
           .order('created_at'),
       builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
+        if (snapshot.connectionState ==
+            ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
         }
+
         if (snapshot.hasError) {
-          return Center(child: Text('خطأ في الطلبات: ${snapshot.error}'));
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                'خطأ في الطلبات: ${snapshot.error}',
+                textAlign: TextAlign.center,
+              ),
+            ),
+          );
         }
+
         final requests = snapshot.data ?? [];
+
         if (requests.isEmpty) {
-          return const Center(child: Text('لا توجد طلبات معلقة'));
+          return const Center(
+            child: Text('لا توجد طلبات معلقة'),
+          );
         }
+
         return ListView.builder(
           padding: const EdgeInsets.all(12),
           itemCount: requests.length,
           itemBuilder: (context, index) {
             final request = requests[index];
             final id = request['id'].toString();
+
             final amount =
-                (request['amount_fils'] as num).toDouble() / 1000;
+                ((request['amount'] as num?) ?? 0).toDouble();
+
             final deposit = request['kind'] == 'deposit';
             final profile = request['profiles'];
-            final playerName =
-                profile is Map ? profile['display_name'] : null;
+
+            final playerName = profile is Map
+                ? profile['display_name']
+                : null;
 
             return Card(
               color: adminSurface,
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  crossAxisAlignment:
+                      CrossAxisAlignment.stretch,
                   children: [
                     Text(
                       deposit ? 'طلب إيداع' : 'طلب سحب',
@@ -488,19 +554,37 @@ class _AdminPageState extends State<AdminPage>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text('اللاعب: ${playerName ?? request['user_id']}'),
-                    Text('المبلغ: ${amount.toStringAsFixed(3)} د.أ'),
-                    Text('الطريقة: ${request['method']}'),
-                    if ((request['payment_reference'] ?? '').toString().isNotEmpty)
-                      Text('مرجع الدفع: ${request['payment_reference']}'),
-                    if ((request['destination'] ?? '').toString().isNotEmpty)
-                      Text('وجهة التحويل: ${request['destination']}'),
-                    Text('تاريخ الطلب: ${request['created_at']}'),
+                    Text(
+                      'اللاعب: ${playerName ?? request['user_id']}',
+                    ),
+                    Text(
+                      'المبلغ: ${amount.toStringAsFixed(3)} د.أ',
+                    ),
+                    Text(
+                      'الطريقة: ${request['payment_method'] ?? '-'}',
+                    ),
+                    if ((request['payment_reference'] ?? '')
+                        .toString()
+                        .isNotEmpty)
+                      Text(
+                        'مرجع الدفع: ${request['payment_reference']}',
+                      ),
+                    if ((request['destination'] ?? '')
+                        .toString()
+                        .isNotEmpty)
+                      Text(
+                        'وجهة التحويل: ${request['destination']}',
+                      ),
+                    Text(
+                      'تاريخ الطلب: ${request['created_at']}',
+                    ),
+                    const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () => reviewRequest(id, true),
+                            onPressed: () =>
+                                reviewRequest(id, true),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                             ),
@@ -510,7 +594,8 @@ class _AdminPageState extends State<AdminPage>
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () => reviewRequest(id, false),
+                            onPressed: () =>
+                                reviewRequest(id, false),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
                             ),
