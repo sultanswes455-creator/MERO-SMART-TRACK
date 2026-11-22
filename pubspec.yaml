@@ -1,6 +1,6 @@
 
-name: mero_play
-description: MERO PLAY virtual arcade games
+name: mero_bet
+description: MERO BET mobile application
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -10,12 +10,12 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
-  supabase_flutter: ^2.10.0
+  cupertino_icons: ^1.0.8
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^4.0.0
+  flutter_lints: ^5.0.0
 
 flutter:
   uses-material-design: true
