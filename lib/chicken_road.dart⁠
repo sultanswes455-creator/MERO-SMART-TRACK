@@ -1,0 +1,535 @@
+
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+class ChickenRoadPage extends StatefulWidget {
+  const ChickenRoadPage({super.key});
+
+  @override
+  State<ChickenRoadPage> createState() => _ChickenRoadPageState();
+}
+
+class _ChickenRoadPageState extends State<ChickenRoadPage> {
+  final supabase = Supabase.instance.client;
+  final stakeController = TextEditingController(text: '1.00');
+
+  static const Color gold = Color(0xFFFFC928);
+  static const Color background = Color(0xFF10131B);
+  static const Color surface = Color(0xFF1B202B);
+
+  String? roundId;
+  int currentStep = 0;
+  double stake = 0;
+  double multiplier = 1;
+  double payout = 0;
+
+  bool loading = false;
+  bool gameOver = false;
+  bool won = false;
+  String message = 'أدخل مبلغ الرهان وابدأ اللعب';
+
+  @override
+  void initState() {
+    super.initState();
+    loadActiveRound();
+  }
+
+  @override
+  void dispose() {
+    stakeController.dispose();
+    super.dispose();
+  }
+
+  double number(dynamic value, [double fallback = 0]) {
+    if (value == null) return fallback;
+    if (value is num) return value.toDouble();
+    return double.tryParse(value.toString()) ?? fallback;
+  }
+
+  Map<String, dynamic> responseMap(dynamic value) {
+    if (value is Map) {
+      return Map<String, dynamic>.from(value);
+    }
+    throw Exception('استجابة غير صحيحة من الخادم');
+  }
+
+  Future<void> loadActiveRound() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return;
+
+    try {
+      final result = await supabase
+          .from('chicken_road_rounds')
+          .select(
+            'id, stake, current_step, multiplier, potential_return, status',
+          )
+          .eq('user_id', user.id)
+          .eq('status', 'active')
+          .maybeSingle();
+
+      if (result == null || !mounted) return;
+
+      setState(() {
+        roundId = result['id'].toString();
+        stake = number(result['stake']);
+        currentStep = number(result['current_step']).toInt();
+        multiplier = number(
+          result['multiplier'],
+          currentStep == 0 ? 1 : 1,
+        );
+        payout = number(result['potential_return']);
+        if (payout <= 0 && currentStep > 0) {
+          payout = stake * multiplier;
+        }
+        gameOver = false;
+        won = false;
+        message = 'لديك جولة سابقة مستمرة. يمكنك المتابعة أو السحب.';
+      });
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          message = 'تعذر تحميل الجولة السابقة: $e';
+        });
+      }
+    }
+  }
+
+  Future<void> startGame() async {
+    if (loading) return;
+
+    final amount = double.tryParse(stakeController.text.trim());
+
+    if (amount == null || amount < 0.10 || amount > 1000) {
+      showMessage('الرهان يجب أن يكون بين 0.10 و1000 دينار');
+      return;
+    }
+
+    setState(() => loading = true);
+
+    try {
+      final result = await supabase.rpc(
+        'mero_chicken_road_start',
+        params: {'p_stake': amount},
+      );
+
+      final data = responseMap(result);
+
+      if (data['round_id'] == null) {
+        throw Exception('لم يتم إنشاء الجولة');
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        roundId = data['round_id'].toString();
+        stake = number(data['stake'], amount);
+        currentStep = 0;
+        multiplier = 1;
+        payout = stake;
+        gameOver = false;
+        won = false;
+        message = 'بدأت الجولة! اعبر الخطوة الأولى.';
+      });
+    } catch (e) {
+      showMessage('تعذر بدء اللعبة: $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> playStep() async {
+    if (loading || roundId == null || gameOver) return;
+
+    setState(() => loading = true);
+
+    try {
+      final result = await supabase.rpc(
+        'mero_chicken_road_step',
+        params: {'p_round_id': roundId},
+      );
+
+      final data = responseMap(result);
+      final status = data['status']?.toString();
+
+      if (!mounted) return;
+
+      setState(() {
+        currentStep = number(data['step'], currentStep).toInt();
+
+        if (status == 'lost' || data['success'] == false) {
+          gameOver = true;
+          won = false;
+          payout = 0;
+          message = 'للأسف! خسرت الجولة. حظاً أوفر في المرة القادمة.';
+        } else if (status == 'completed') {
+          gameOver = true;
+          won = true;
+          multiplier = number(data['multiplier'], multiplier);
+          payout = number(data['payout']);
+          message = 'مبروك! أكملت جميع الخطوات العشرين.';
+        } else {
+          multiplier = number(data['multiplier'], multiplier);
+          payout = number(data['payout'], stake * multiplier);
+          message = 'نجحت! وصلت إلى الخطوة $currentStep. هل تتابع أم تسحب؟';
+        }
+      });
+    } catch (e) {
+      showMessage('حدث خطأ أثناء اللعب: $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  Future<void> cashOut() async {
+    if (loading || roundId == null || currentStep < 1 || gameOver) return;
+
+    setState(() => loading = true);
+
+    try {
+      final result = await supabase.rpc(
+        'mero_chicken_road_cashout',
+        params: {'p_round_id': roundId},
+      );
+
+      final data = responseMap(result);
+
+      if (!mounted) return;
+
+      setState(() {
+        multiplier = number(data['multiplier'], multiplier);
+        payout = number(data['payout'], payout);
+        gameOver = true;
+        won = true;
+        message = 'تم السحب بنجاح! ربحت ${payout.toStringAsFixed(2)} دينار.';
+      });
+    } catch (e) {
+      showMessage('تعذر سحب الأرباح: $e');
+    } finally {
+      if (mounted) setState(() => loading = false);
+    }
+  }
+
+  void newGame() {
+    setState(() {
+      roundId = null;
+      currentStep = 0;
+      stake = 0;
+      multiplier = 1;
+      payout = 0;
+      gameOver = false;
+      won = false;
+      message = 'أدخل مبلغ الرهان وابدأ اللعب';
+    });
+  }
+
+  void showMessage(String text) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text)),
+    );
+  }
+
+  Widget infoBox(String title, String value) {
+    return Expanded(
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 15, horizontal: 8),
+        margin: const EdgeInsets.symmetric(horizontal: 4),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: gold.withOpacity(0.25)),
+        ),
+        child: Column(
+          children: [
+            Text(title, style: const TextStyle(color: Colors.white70)),
+            const SizedBox(height: 8),
+            Text(
+              value,
+              style: const TextStyle(
+                color: gold,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget stepTile(int step) {
+    final passed = step <= currentStep;
+    final current = step == currentStep + 1 && roundId != null && !gameOver;
+
+    return Container(
+      width: 43,
+      height: 43,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: passed
+            ? gold
+            : current
+                ? Colors.green.shade700
+                : surface,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(
+          color: current ? Colors.white : gold.withOpacity(0.2),
+        ),
+      ),
+      child: Text(
+        '$step',
+        style: TextStyle(
+          color: passed ? Colors.black : Colors.white,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
+  Widget actionButton({
+    required String text,
+    required VoidCallback? onPressed,
+    Color color = gold,
+    Color textColor = Colors.black,
+  }) {
+    return SizedBox(
+      width: double.infinity,
+      height: 52,
+      child: ElevatedButton(
+        onPressed: loading ? null : onPressed,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: color,
+          foregroundColor: textColor,
+          disabledBackgroundColor: Colors.grey.shade700,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(13),
+          ),
+        ),
+        child: loading
+            ? const SizedBox(
+                height: 22,
+                width: 22,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Text(
+                text,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final active = roundId != null && !gameOver;
+
+    return Directionality(
+      textDirection: TextDirection.rtl,
+      child: Scaffold(
+        backgroundColor: background,
+        appBar: AppBar(
+          backgroundColor: surface,
+          title: const Text(
+            'CHICKEN ROAD',
+            style: TextStyle(
+              color: gold,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          centerTitle: true,
+        ),
+        body: SafeArea(
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.green.shade900,
+                      const Color(0xFF172D25),
+                      surface,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: gold.withOpacity(0.35)),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      '🐔',
+                      style: TextStyle(fontSize: 65),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'اعبر الطريق واجمع الأرباح!',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 19,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    const Text(
+                      '20 خطوة - مخاطرة متوسطة',
+                      style: TextStyle(color: Colors.white70),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              Row(
+                children: [
+                  infoBox('الخطوة', '$currentStep / 20'),
+                  infoBox('المضاعف', '${multiplier.toStringAsFixed(2)}x'),
+                  infoBox('الأرباح', '${payout.toStringAsFixed(2)} د.أ'),
+                ],
+              ),
+
+              const SizedBox(height: 20),
+
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: surface,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Column(
+                  children: [
+                    const Text(
+                      'طريق الدجاجة',
+                      style: TextStyle(
+                        color: gold,
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      alignment: WrapAlignment.center,
+                      children: List.generate(
+                        20,
+                        (index) => stepTile(index + 1),
+                      ),
+                    ),
+                    const SizedBox(height: 15),
+                    Text(
+                      currentStep == 0
+                          ? 'ابدأ رحلتك'
+                          : '🐔 وصلت إلى $currentStep خطوة',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 18),
+
+              Container(
+                padding: const EdgeInsets.all(15),
+                decoration: BoxDecoration(
+                  color: surface,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'مبلغ الرهان (دينار أردني)',
+                      style: TextStyle(color: Colors.white),
+                    ),
+                    const SizedBox(height: 10),
+                    TextField(
+                      controller: stakeController,
+                      enabled: !active && !loading,
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: 'مثال: 1.00',
+                        filled: true,
+                        fillColor: background,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              Container(
+                padding: const EdgeInsets.all(14),
+                decoration: BoxDecoration(
+                  color: surface,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Text(
+                  message,
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                  ),
+                ),
+              ),
+
+              const SizedBox(height: 15),
+
+              if (roundId == null)
+                actionButton(
+                  text: 'ابدأ اللعبة',
+                  onPressed: startGame,
+                ),
+
+              if (active) ...[
+                actionButton(
+                  text: 'اعبر الخطوة التالية',
+                  onPressed: playStep,
+                ),
+                const SizedBox(height: 10),
+                actionButton(
+                  text: 'اسحب أرباحي الآن',
+                  onPressed: currentStep >= 1 ? cashOut : null,
+                  color: Colors.green,
+                  textColor: Colors.white,
+                ),
+              ],
+
+              if (gameOver) ...[
+                actionButton(
+                  text: won ? 'ابدأ جولة جديدة' : 'العب مرة أخرى',
+                  onPressed: newGame,
+                ),
+              ],
+
+              const SizedBox(height: 20),
+
+              const Text(
+                'يتم احتساب الخطوات والأرباح من الخادم.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white38, fontSize: 12),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
