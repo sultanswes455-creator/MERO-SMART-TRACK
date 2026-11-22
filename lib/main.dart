@@ -1,6 +1,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'betting.dart';
 
 const supabaseUrl = 'https://gisiwcwellmuargvijuu.supabase.co';
 const supabasePublishableKey =
@@ -75,6 +76,7 @@ class LoginPage extends StatefulWidget {
 class _LoginPageState extends State<LoginPage> {
   final email = TextEditingController();
   final password = TextEditingController();
+
   bool isRegister = false;
   bool loading = false;
 
@@ -85,6 +87,7 @@ class _LoginPageState extends State<LoginPage> {
     }
 
     setState(() => loading = true);
+
     try {
       if (isRegister) {
         final result = await supabase.auth.signUp(
@@ -106,7 +109,9 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       message('حدث خطأ أثناء الاتصال: $e');
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
   }
 
@@ -131,7 +136,11 @@ class _LoginPageState extends State<LoginPage> {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              const Icon(Icons.sports_soccer, color: gold, size: 65),
+              const Icon(
+                Icons.sports_soccer,
+                color: gold,
+                size: 65,
+              ),
               const SizedBox(height: 12),
               const Text(
                 'MERO BET',
@@ -216,7 +225,7 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final pages = [
-      const EventsPage(),
+      const BettingPage(),
       const WalletPage(),
       const AccountPage(),
     ];
@@ -226,10 +235,16 @@ class _MainScreenState extends State<MainScreen> {
         backgroundColor: surface,
         title: const Text(
           'MERO BET',
-          style: TextStyle(color: gold, fontWeight: FontWeight.bold),
+          style: TextStyle(
+            color: gold,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
-      body: pages[page],
+      body: IndexedStack(
+        index: page,
+        children: pages,
+      ),
       bottomNavigationBar: NavigationBar(
         backgroundColor: surface,
         selectedIndex: page,
@@ -240,7 +255,7 @@ class _MainScreenState extends State<MainScreen> {
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.sports_soccer),
-            label: 'المباريات',
+            label: 'الرهانات',
           ),
           NavigationDestination(
             icon: Icon(Icons.account_balance_wallet),
@@ -252,82 +267,6 @@ class _MainScreenState extends State<MainScreen> {
           ),
         ],
       ),
-    );
-  }
-}
-
-class EventsPage extends StatelessWidget {
-  const EventsPage({super.key});
-
-  String eventName(Map<String, dynamic> row, List<String> keys) {
-    for (final key in keys) {
-      final value = row[key];
-      if (value != null && value.toString().isNotEmpty) {
-        return value.toString();
-      }
-    }
-    return '—';
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: supabase.from('events').select(),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Text('تعذر تحميل المباريات: ${snapshot.error}'),
-          );
-        }
-
-        final events = snapshot.data ?? [];
-
-        if (events.isEmpty) {
-          return const Center(
-            child: Text('لا توجد مباريات حالياً'),
-          );
-        }
-
-        return RefreshIndicator(
-          onRefresh: () async {
-            await supabase.from('events').select();
-          },
-          child: ListView.builder(
-            padding: const EdgeInsets.all(14),
-            itemCount: events.length,
-            itemBuilder: (context, index) {
-              final event = events[index];
-
-              final title = eventName(
-                event,
-                ['title', 'name', 'home_team', 'home_name'],
-              );
-              final away = eventName(
-                event,
-                ['away_team', 'away_name', 'opponent'],
-              );
-              final status = eventName(event, ['status']);
-
-              return Card(
-                color: surface,
-                margin: const EdgeInsets.only(bottom: 12),
-                child: ListTile(
-                  leading: const Icon(
-                    Icons.sports_soccer,
-                    color: gold,
-                  ),
-                  title: Text('$title  -  $away'),
-                  subtitle: Text('الحالة: $status'),
-                ),
-              );
-            },
-          ),
-        );
-      },
     );
   }
 }
@@ -379,7 +318,7 @@ class WalletPage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                'طلبات الإيداع والسحب ستُربط في المرحلة التالية.',
+                'طلبات الإيداع والسحب ستُضاف في المرحلة التالية.',
                 textAlign: TextAlign.center,
               ),
             ],
@@ -401,7 +340,11 @@ class AccountPage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(Icons.person, color: gold, size: 60),
+          const Icon(
+            Icons.person,
+            color: gold,
+            size: 60,
+          ),
           const SizedBox(height: 12),
           Text(user?.email ?? 'المستخدم'),
           const SizedBox(height: 20),
