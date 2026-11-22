@@ -2,6 +2,7 @@
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'betting.dart';
+import 'admin.dart';
 
 const supabaseUrl = 'https://gisiwcwellmuargvijuu.supabase.co';
 const supabasePublishableKey =
@@ -221,52 +222,99 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int page = 0;
+  late Future<bool> ownerFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    ownerFuture = checkOwner();
+  }
+
+  Future<bool> checkOwner() async {
+    final user = supabase.auth.currentUser;
+    if (user == null) return false;
+
+    try {
+      final profile = await supabase
+          .from('profiles')
+          .select('role')
+          .eq('id', user.id)
+          .maybeSingle();
+
+      return profile?['role'] == 'owner';
+    } catch (_) {
+      return false;
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final pages = [
-      const BettingPage(),
-      const WalletPage(),
-      const AccountPage(),
-    ];
+    return FutureBuilder<bool>(
+      future: ownerFuture,
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
 
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: surface,
-        title: const Text(
-          'MERO BET',
-          style: TextStyle(
-            color: gold,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ),
-      body: IndexedStack(
-        index: page,
-        children: pages,
-      ),
-      bottomNavigationBar: NavigationBar(
-        backgroundColor: surface,
-        selectedIndex: page,
-        indicatorColor: gold.withOpacity(0.2),
-        onDestinationSelected: (value) {
-          setState(() => page = value);
-        },
-        destinations: const [
-          NavigationDestination(
+        final isOwner = snapshot.data == true;
+
+        final pages = <Widget>[
+          const BettingPage(),
+          const WalletPage(),
+          const AccountPage(),
+          if (isOwner) const AdminPage(),
+        ];
+
+        final destinations = <NavigationDestination>[
+          const NavigationDestination(
             icon: Icon(Icons.sports_soccer),
             label: 'الرهانات',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.account_balance_wallet),
             label: 'المحفظة',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.person),
             label: 'حسابي',
           ),
-        ],
-      ),
+          if (isOwner)
+            const NavigationDestination(
+              icon: Icon(Icons.admin_panel_settings),
+              label: 'الإدارة',
+            ),
+        ];
+
+        if (page >= pages.length) page = 0;
+
+        return Scaffold(
+          appBar: AppBar(
+            backgroundColor: surface,
+            title: const Text(
+              'MERO BET',
+              style: TextStyle(
+                color: gold,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+          body: IndexedStack(
+            index: page,
+            children: pages,
+          ),
+          bottomNavigationBar: NavigationBar(
+            backgroundColor: surface,
+            selectedIndex: page,
+            indicatorColor: gold.withOpacity(0.2),
+            onDestinationSelected: (value) {
+              setState(() => page = value);
+            },
+            destinations: destinations,
+          ),
+        );
+      },
     );
   }
 }
@@ -295,7 +343,8 @@ class WalletPage extends StatelessWidget {
             );
           }
 
-          final balance = snapshot.data ?? 0;
+          final fils = (snapshot.data as num?)?.toInt() ?? 0;
+          final balance = fils / 1000;
 
           return Column(
             mainAxisAlignment: MainAxisAlignment.center,
@@ -309,7 +358,7 @@ class WalletPage extends StatelessWidget {
               const Text('رصيد الحساب'),
               const SizedBox(height: 10),
               Text(
-                '$balance JOD',
+                '${balance.toStringAsFixed(3)} د.أ',
                 style: const TextStyle(
                   color: gold,
                   fontSize: 30,
@@ -318,7 +367,7 @@ class WalletPage extends StatelessWidget {
               ),
               const SizedBox(height: 12),
               const Text(
-                'طلبات الإيداع والسحب ستُضاف في المرحلة التالية.',
+                'سيتم إضافة واجهة الإيداع والسحب في المرحلة التالية.',
                 textAlign: TextAlign.center,
               ),
             ],
