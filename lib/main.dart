@@ -251,6 +251,7 @@ class _MainScreenState extends State<MainScreen> {
 
         final pages = <Widget>[
           const BettingPage(),
+          const CasinoPage(),
           const WalletPage(),
           const AccountPage(),
           if (isOwner) const AdminPage(),
@@ -260,6 +261,10 @@ class _MainScreenState extends State<MainScreen> {
           const NavigationDestination(
             icon: Icon(Icons.sports_soccer),
             label: 'الرهانات',
+          ),
+          const NavigationDestination(
+            icon: Icon(Icons.casino),
+            label: 'الكازينو',
           ),
           const NavigationDestination(
             icon: Icon(Icons.account_balance_wallet),
@@ -304,6 +309,61 @@ class _MainScreenState extends State<MainScreen> {
           ),
         );
       },
+    );
+  }
+}
+
+class CasinoPage extends StatelessWidget {
+  const CasinoPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        const Text(
+          'كازينو MERO',
+          style: TextStyle(
+            color: gold,
+            fontSize: 26,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 8),
+        const Text(
+          'اختر اللعبة التي تريد لعبها',
+          style: TextStyle(color: Colors.white70),
+        ),
+        const SizedBox(height: 20),
+        Card(
+          color: surface,
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: const CircleAvatar(
+              backgroundColor: gold,
+              child: Icon(Icons.route, color: Colors.black),
+            ),
+            title: const Text(
+              'Chicken Road',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            subtitle: const Text(
+              '20 خطوة • مخاطرة متوسطة',
+            ),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(
+                  content: Text('لعبة Chicken Road قيد تجهيز واجهتها وربطها'),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
