@@ -26,7 +26,9 @@ class _WalletPageState extends State<WalletPage> {
 
   Future<int> getBalance() async {
     final result = await walletDb.rpc('mero_balance');
-    return (result as num).toInt();
+    if (result == null) return 0;
+    if (result is num) return result.round();
+    return int.tryParse(result.toString()) ?? 0;
   }
 
   void notify(String text) {
@@ -45,8 +47,26 @@ class _WalletPageState extends State<WalletPage> {
   Future<void> submit() async {
     final value = double.tryParse(amount.text.trim());
 
-    if (value == null || value < 0.100) {
-      notify('أدخل مبلغاً صحيحاً لا يقل عن 0.100 دينار');
+    if (value == null || value <= 0) {
+      notify('أدخل مبلغاً صحيحاً');
+      return;
+    }
+
+    if (value < 1) {
+      notify(
+        kind == 'deposit'
+            ? 'الحد الأدنى للإيداع هو 1 JOD'
+            : 'الحد الأدنى للسحب هو 1 JOD',
+      );
+      return;
+    }
+
+    if (value > 200) {
+      notify(
+        kind == 'deposit'
+            ? 'الحد الأقصى للإيداع هو 200 JOD'
+            : 'الحد الأقصى للسحب هو 200 JOD',
+      );
       return;
     }
 
@@ -112,6 +132,60 @@ class _WalletPageState extends State<WalletPage> {
     super.dispose();
   }
 
+  Widget limitsCard() {
+    return Container(
+      padding: const EdgeInsets.all(15),
+      decoration: BoxDecoration(
+        color: const Color(0xFF1B202B),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: const Color(0xFFFFC928).withOpacity(0.5),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            kind == 'deposit' ? 'حدود الإيداع' : 'حدود السحب',
+            style: const TextStyle(
+              color: Color(0xFFFFC928),
+              fontWeight: FontWeight.bold,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 10),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('الحد الأدنى'),
+              Text(
+                '1 JOD',
+                style: TextStyle(
+                  color: Color(0xFFFFC928),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text('الحد الأقصى'),
+              Text(
+                '200 JOD',
+                style: TextStyle(
+                  color: Color(0xFFFFC928),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -166,9 +240,15 @@ class _WalletPageState extends State<WalletPage> {
           ],
           selected: {kind},
           onSelectionChanged: (value) {
-            setState(() => kind = value.first);
+            setState(() {
+              kind = value.first;
+            });
           },
         ),
+
+        const SizedBox(height: 18),
+
+        limitsCard(),
 
         const SizedBox(height: 18),
 
@@ -273,7 +353,7 @@ class _WalletPageState extends State<WalletPage> {
           ),
           decoration: const InputDecoration(
             labelText: 'المبلغ بالدينار الأردني',
-            hintText: 'مثال: 10.000',
+            hintText: 'من 1 إلى 200 JOD',
             border: OutlineInputBorder(),
           ),
         ),
