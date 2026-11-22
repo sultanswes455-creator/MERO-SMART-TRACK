@@ -215,7 +215,9 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int page = 0;
   late Future<bool> ownerFuture;
-  late Future<int> balanceFuture;
+
+  // تم إصلاح نوع الرصيد هنا
+  late Future<double> balanceFuture;
 
   @override
   void initState() {
@@ -241,7 +243,7 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  // الرصيد مخزن بالدينار الأردني مباشرة.
+  // الرصيد مخزن بالدينار الأردني مباشرة
   Future<double> getBalance() async {
     final result = await supabase.rpc('mero_balance');
 
