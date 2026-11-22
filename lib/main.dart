@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'betting.dart';
 import 'admin.dart';
+import 'wallet.dart';
 
 const supabaseUrl = 'https://gisiwcwellmuargvijuu.supabase.co';
 const supabasePublishableKey =
@@ -82,7 +83,8 @@ class _LoginPageState extends State<LoginPage> {
   bool loading = false;
 
   Future<void> submit() async {
-    if (email.text.trim().isEmpty || password.text.length < 6) {
+    if (email.text.trim().isEmpty ||
+        password.text.length < 6) {
       message('أدخل البريد وكلمة مرور من 6 أحرف على الأقل');
       return;
     }
@@ -110,9 +112,7 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       message('حدث خطأ أثناء الاتصال: $e');
     } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+      if (mounted) setState(() => loading = false);
     }
   }
 
@@ -137,11 +137,7 @@ class _LoginPageState extends State<LoginPage> {
           padding: const EdgeInsets.all(24),
           child: Column(
             children: [
-              const Icon(
-                Icons.sports_soccer,
-                color: gold,
-                size: 65,
-              ),
+              const Icon(Icons.sports_soccer, color: gold, size: 65),
               const SizedBox(height: 12),
               const Text(
                 'MERO BET',
@@ -181,11 +177,6 @@ class _LoginPageState extends State<LoginPage> {
                 width: double.infinity,
                 child: ElevatedButton(
                   onPressed: loading ? null : submit,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: gold,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.all(15),
-                  ),
                   child: Text(
                     loading
                         ? 'يرجى الانتظار...'
@@ -196,9 +187,7 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               TextButton(
-                onPressed: () {
-                  setState(() => isRegister = !isRegister);
-                },
+                onPressed: () => setState(() => isRegister = !isRegister),
                 child: Text(
                   isRegister
                       ? 'لديك حساب؟ سجل الدخول'
@@ -319,65 +308,6 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-class WalletPage extends StatelessWidget {
-  const WalletPage({super.key});
-
-  Future<dynamic> getBalance() async {
-    return await supabase.rpc('mero_balance');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: FutureBuilder<dynamic>(
-        future: getBalance(),
-        builder: (context, snapshot) {
-          if (snapshot.connectionState == ConnectionState.waiting) {
-            return const CircularProgressIndicator();
-          }
-
-          if (snapshot.hasError) {
-            return Padding(
-              padding: const EdgeInsets.all(20),
-              child: Text('تعذر جلب الرصيد: ${snapshot.error}'),
-            );
-          }
-
-          final fils = (snapshot.data as num?)?.toInt() ?? 0;
-          final balance = fils / 1000;
-
-          return Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(
-                Icons.account_balance_wallet,
-                color: gold,
-                size: 55,
-              ),
-              const SizedBox(height: 15),
-              const Text('رصيد الحساب'),
-              const SizedBox(height: 10),
-              Text(
-                '${balance.toStringAsFixed(3)} د.أ',
-                style: const TextStyle(
-                  color: gold,
-                  fontSize: 30,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 12),
-              const Text(
-                'سيتم إضافة واجهة الإيداع والسحب في المرحلة التالية.',
-                textAlign: TextAlign.center,
-              ),
-            ],
-          );
-        },
-      ),
-    );
-  }
-}
-
 class AccountPage extends StatelessWidget {
   const AccountPage({super.key});
 
@@ -389,11 +319,7 @@ class AccountPage extends StatelessWidget {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          const Icon(
-            Icons.person,
-            color: gold,
-            size: 60,
-          ),
+          const Icon(Icons.person, color: gold, size: 60),
           const SizedBox(height: 12),
           Text(user?.email ?? 'المستخدم'),
           const SizedBox(height: 20),
