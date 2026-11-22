@@ -1,0 +1,359 @@
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+
+const gold = Color(0xFFFFC928);
+const surface = Color(0xFF1B202B);
+
+class BettingPage extends StatefulWidget {
+  const BettingPage({super.key});
+
+  @override
+  State<BettingPage> createState() => _BettingPageState();
+}
+
+class _BettingPageState extends State<BettingPage> {
+  final db = Supabase.instance.client;
+  final stakeController = TextEditingController(text: '1.000');
+
+  final Map<String, Map<String, dynamic>> slip = {};
+  bool loading = false;
+
+  int get stakeFils {
+    final value = double.tryParse(
+          stakeController.text.trim().replaceAll(',', '.'),
+        ) ??
+        0;
+    return (value * 1000).round();
+  }
+
+  double get totalOdds {
+    return slip.values.fold<double>(
+      1,
+      (total, item) => total * (item['odds'] as num).toDouble(),
+    );
+  }
+
+  void addSelection(
+    Map<String, dynamic> selection,
+    String eventId,
+  ) {
+    setState(() {
+      slip.removeWhere(
+        (key, value) => value['event_id'] == eventId,
+      );
+
+      slip[selection['id'].toString()] = {
+        ...selection,
+        'event_id': eventId,
+      };
+    });
+  }
+
+  void showMessage(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message)),
+    );
+  }
+
+  Future<void> placeBet() async {
+    if (slip.isEmpty) {
+      showMessage('اختر نتيجة أولاً');
+      return;
+    }
+
+    if (stakeFils < 100) {
+      showMessage('الحد الأدنى للرهان 0.100 دينار');
+      return;
+    }
+
+    setState(() => loading = true);
+
+    try {
+      final result = await db.rpc(
+        'mero_place_bet',
+        params: {
+          'p_selection_ids': slip.keys.toList(),
+          'p_stake_fils': stakeFils,
+        },
+      );
+
+      if (!mounted) return;
+
+      setState(() => slip.clear());
+      showMessage('تم تسجيل القسيمة بنجاح');
+    } on PostgrestException catch (e) {
+      showMessage(e.message);
+    } catch (e) {
+      showMessage('حدث خطأ: $e');
+    } finally {
+      if (mounted) {
+        setState(() => loading = false);
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    stakeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Expanded(child: eventsList()),
+        slipPanel(),
+      ],
+    );
+  }
+
+  Widget eventsList() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: db
+          .from('events')
+          .select()
+          .eq('status', 'upcoming')
+          .order('starts_at'),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(
+            child: CircularProgressIndicator(),
+          );
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Text('تعذر تحميل المباريات: ${snapshot.error}'),
+          );
+        }
+
+        final events = snapshot.data ?? [];
+
+        if (events.isEmpty) {
+          return const Center(
+            child: Text('لا توجد مباريات قادمة حالياً'),
+          );
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: events.length,
+          itemBuilder: (context, index) {
+            return eventCard(events[index]);
+          },
+        );
+      },
+    );
+  }
+
+  Widget eventCard(Map<String, dynamic> event) {
+    final eventId = event['id'].toString();
+
+    return Card(
+      color: surface,
+      margin: const EdgeInsets.only(bottom: 12),
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            Text(
+              event['league']?.toString() ??
+                  event['sport']?.toString() ??
+                  'مباراة',
+              style: const TextStyle(
+                color: gold,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${event['home_name']}  ×  ${event['away_name']}',
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 12),
+            marketsList(eventId),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget marketsList(String eventId) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: db
+          .from('markets')
+          .select()
+          .eq('event_id', eventId)
+          .eq('is_open', true),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const LinearProgressIndicator();
+        }
+
+        if (snapshot.hasError) {
+          return Text('خطأ: ${snapshot.error}');
+        }
+
+        final markets = snapshot.data ?? [];
+
+        if (markets.isEmpty) {
+          return const Text('لا توجد أسواق متاحة');
+        }
+
+        return Column(
+          children: markets.map((market) {
+            return marketOptions(market, eventId);
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget marketOptions(
+    Map<String, dynamic> market,
+    String eventId,
+  ) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: db
+          .from('selections')
+          .select()
+          .eq('market_id', market['id'].toString())
+          .eq('is_active', true),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const LinearProgressIndicator();
+        }
+
+        if (snapshot.hasError) {
+          return Text('خطأ: ${snapshot.error}');
+        }
+
+        final options = snapshot.data ?? [];
+
+        if (options.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text(
+              market['name'].toString(),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            Wrap(
+              spacing: 8,
+              children: options.map((option) {
+                final id = option['id'].toString();
+                final selected = slip.containsKey(id);
+
+                return OutlinedButton(
+                  style: OutlinedButton.styleFrom(
+                    backgroundColor:
+                        selected ? gold.withOpacity(0.2) : null,
+                    side: BorderSide(
+                      color: selected ? gold : Colors.white24,
+                    ),
+                  ),
+                  onPressed: () {
+                    addSelection(option, eventId);
+                  },
+                  child: Text(
+                    '${option['label']}  ${option['odds']}',
+                    style: TextStyle(
+                      color: selected ? gold : Colors.white,
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 10),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget slipPanel() {
+    return Container(
+      color: surface,
+      padding: const EdgeInsets.all(12),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Row(
+            children: [
+              const Text(
+                'قسيمة الرهان',
+                style: TextStyle(
+                  color: gold,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Text('${slip.length} اختيارات'),
+              IconButton(
+                onPressed: slip.isEmpty
+                    ? null
+                    : () => setState(() => slip.clear()),
+                icon: const Icon(Icons.delete_outline),
+              ),
+            ],
+          ),
+          ...slip.entries.map((entry) {
+            return Row(
+              children: [
+                Expanded(
+                  child: Text(entry.value['label'].toString()),
+                ),
+                Text('× ${entry.value['odds']}'),
+                IconButton(
+                  onPressed: () {
+                    setState(() => slip.remove(entry.key));
+                  },
+                  icon: const Icon(Icons.close),
+                ),
+              ],
+            );
+          }),
+          TextField(
+            controller: stakeController,
+            keyboardType: const TextInputType.numberWithOptions(
+              decimal: true,
+            ),
+            decoration: const InputDecoration(
+              labelText: 'مبلغ الرهان بالدينار',
+              hintText: 'مثال: 1.000',
+            ),
+            onChanged: (_) => setState(() {}),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'المعامل الإجمالي: ${slip.isEmpty ? '—' : totalOdds.toStringAsFixed(3)}',
+          ),
+          Text(
+            'العائد المحتمل: '
+            '${(stakeFils * totalOdds / 1000).toStringAsFixed(3)} د.أ',
+          ),
+          const SizedBox(height: 8),
+          ElevatedButton(
+            onPressed: loading || slip.isEmpty ? null : placeBet,
+            style: ElevatedButton.styleFrom(
+              backgroundColor: gold,
+              foregroundColor: Colors.black,
+            ),
+            child: Text(
+              loading ? 'يرجى الانتظار...' : 'تأكيد القسيمة',
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
