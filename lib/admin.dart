@@ -20,7 +20,7 @@ class _AdminPageState extends State<AdminPage>
   @override
   void initState() {
     super.initState();
-    tabs = TabController(length: 2, vsync: this);
+    tabs = TabController(length: 4, vsync: this);
   }
 
   @override
@@ -35,6 +35,27 @@ class _AdminPageState extends State<AdminPage>
       SnackBar(content: Text(value)),
     );
   }
+
+  Widget field(TextEditingController c, String label,
+      {TextInputType? keyboard}) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: c,
+        keyboardType: keyboard,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> refresh() async {
+    if (mounted) setState(() {});
+  }
+
+  // ---------------- المباريات ----------------
 
   Future<void> addEvent() async {
     final sport = TextEditingController(text: 'كرة القدم');
@@ -55,11 +76,11 @@ class _AdminPageState extends State<AdminPage>
         content: SingleChildScrollView(
           child: Column(
             children: [
-              _field(sport, 'الرياضة'),
-              _field(league, 'الدوري أو البطولة'),
-              _field(home, 'الفريق الأول'),
-              _field(away, 'الفريق الثاني'),
-              _field(date, 'الموعد: 2026-11-23T20:30'),
+              field(sport, 'الرياضة'),
+              field(league, 'الدوري أو البطولة'),
+              field(home, 'الفريق الأول'),
+              field(away, 'الفريق الثاني'),
+              field(date, 'الموعد: 2026-11-23T20:30'),
             ],
           ),
         ),
@@ -70,7 +91,7 @@ class _AdminPageState extends State<AdminPage>
           ),
           ElevatedButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('حفظ المباراة'),
+            child: const Text('حفظ'),
           ),
         ],
       ),
@@ -79,7 +100,15 @@ class _AdminPageState extends State<AdminPage>
     if (ok != true) return;
 
     try {
+      if (home.text.trim().isEmpty ||
+          away.text.trim().isEmpty ||
+          league.text.trim().isEmpty) {
+        message('أكمل بيانات المباراة');
+        return;
+      }
+
       final start = DateTime.parse(date.text.trim());
+
       await db.from('events').insert({
         'sport': sport.text.trim(),
         'league': league.text.trim(),
@@ -88,24 +117,12 @@ class _AdminPageState extends State<AdminPage>
         'starts_at': start.toUtc().toIso8601String(),
         'status': 'upcoming',
       });
+
       message('تمت إضافة المباراة');
-      setState(() {});
+      refresh();
     } catch (e) {
       message('تعذر إضافة المباراة: $e');
     }
-  }
-
-  Widget _field(TextEditingController controller, String label) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 10),
-      child: TextField(
-        controller: controller,
-        decoration: InputDecoration(
-          labelText: label,
-          border: const OutlineInputBorder(),
-        ),
-      ),
-    );
   }
 
   Future<void> addMarket(String eventId) async {
@@ -115,7 +132,7 @@ class _AdminPageState extends State<AdminPage>
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('إضافة سوق'),
-        content: _field(name, 'اسم السوق'),
+        content: field(name, 'اسم السوق'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
@@ -138,7 +155,7 @@ class _AdminPageState extends State<AdminPage>
         'is_open': true,
       });
       message('تمت إضافة السوق');
-      setState(() {});
+      refresh();
     } catch (e) {
       message('خطأ: $e');
     }
@@ -151,12 +168,12 @@ class _AdminPageState extends State<AdminPage>
     final ok = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('إضافة اختيار ومعامل'),
+        title: const Text('إضافة اختيار'),
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            _field(label, 'اسم الاختيار'),
-            _field(odds, 'المعامل مثل 2.00'),
+            field(label, 'اسم الاختيار'),
+            field(odds, 'المعامل'),
           ],
         ),
         actions: [
@@ -175,11 +192,12 @@ class _AdminPageState extends State<AdminPage>
     if (ok != true) return;
 
     final value = double.tryParse(odds.text.trim());
+
     if (label.text.trim().isEmpty ||
         value == null ||
         value <= 1 ||
         value > 1000) {
-      message('تحقق من الاسم والمعامل؛ يجب أن يكون أكبر من 1');
+      message('تحقق من الاسم والمعامل');
       return;
     }
 
@@ -192,107 +210,37 @@ class _AdminPageState extends State<AdminPage>
         'result': 'pending',
       });
       message('تمت إضافة الاختيار');
-      setState(() {});
+      refresh();
     } catch (e) {
       message('خطأ: $e');
     }
   }
 
-  Future<void> setResult(String selectionId, String result) async {
+  Future<void> setResult(String id, String result) async {
     try {
       await db.from('selections').update({
         'result': result,
         'is_active': false,
-      }).eq('id', selectionId);
+      }).eq('id', id);
 
       message('تم حفظ النتيجة');
-      setState(() {});
+      refresh();
     } catch (e) {
       message('تعذر حفظ النتيجة: $e');
     }
   }
 
-  Future<void> closeEvent(String eventId) async {
+  Future<void> closeEvent(String id) async {
     try {
       await db.from('events').update({
         'status': 'finished',
-      }).eq('id', eventId);
+      }).eq('id', id);
 
       message('تم إنهاء المباراة');
-      setState(() {});
+      refresh();
     } catch (e) {
       message('تعذر إنهاء المباراة: $e');
     }
-  }
-
-  Future<void> reviewRequest(String id, bool approve) async {
-    try {
-      await db.rpc(
-        'mero_review_wallet_request',
-        params: {
-          'p_request_id': id,
-          'p_approve': approve,
-        },
-      );
-
-      message(
-        approve
-            ? 'تمت الموافقة على الطلب'
-            : 'تم رفض الطلب',
-      );
-
-      setState(() {});
-    } catch (e) {
-      message('تعذر معالجة الطلب: $e');
-    }
-  }
-
-  Future<void> settleBet(String id) async {
-    try {
-      await db.rpc(
-        'mero_settle_bet',
-        params: {'p_bet_id': id},
-      );
-
-      message('تمت تسوية القسيمة');
-      setState(() {});
-    } catch (e) {
-      message('تعذرت التسوية: $e');
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Material(
-          color: adminSurface,
-          child: TabBar(
-            controller: tabs,
-            labelColor: adminGold,
-            tabs: const [
-              Tab(
-                icon: Icon(Icons.sports_soccer),
-                text: 'المباريات',
-              ),
-              Tab(
-                icon: Icon(Icons.account_balance_wallet),
-                text: 'طلبات المحفظة',
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: tabs,
-            children: [
-              eventsTab(),
-              requestsTab(),
-            ],
-          ),
-        ),
-      ],
-    );
   }
 
   Widget eventsTab() {
@@ -333,9 +281,7 @@ class _AdminPageState extends State<AdminPage>
               final events = snapshot.data ?? [];
 
               if (events.isEmpty) {
-                return const Center(
-                  child: Text('لا توجد مباريات'),
-                );
+                return const Center(child: Text('لا توجد مباريات'));
               }
 
               return ListView.builder(
@@ -360,17 +306,12 @@ class _AdminPageState extends State<AdminPage>
                               fontSize: 17,
                             ),
                           ),
-                          Text(
-                            '${event['league']} • ${event['status']}',
-                          ),
+                          Text('${event['league']} • ${event['status']}'),
                           Text('الموعد: ${event['starts_at']}'),
-                          const SizedBox(height: 8),
                           OutlinedButton.icon(
                             onPressed: () => addMarket(id),
                             icon: const Icon(Icons.add),
-                            label: const Text(
-                              'إضافة سوق للمباراة',
-                            ),
+                            label: const Text('إضافة سوق'),
                           ),
                           marketsForEvent(id),
                           if (event['status'] == 'upcoming' ||
@@ -394,10 +335,7 @@ class _AdminPageState extends State<AdminPage>
 
   Widget marketsForEvent(String eventId) {
     return FutureBuilder<List<Map<String, dynamic>>>(
-      future: db
-          .from('markets')
-          .select()
-          .eq('event_id', eventId),
+      future: db.from('markets').select().eq('event_id', eventId),
       builder: (context, snapshot) {
         if (!snapshot.hasData) {
           return const SizedBox.shrink();
@@ -405,7 +343,7 @@ class _AdminPageState extends State<AdminPage>
 
         return Column(
           children: snapshot.data!.map((market) {
-            final marketId = market['id'].toString();
+            final id = market['id'].toString();
 
             return Container(
               margin: const EdgeInsets.only(top: 8),
@@ -422,11 +360,11 @@ class _AdminPageState extends State<AdminPage>
                     style: const TextStyle(color: adminGold),
                   ),
                   TextButton.icon(
-                    onPressed: () => addSelection(marketId),
+                    onPressed: () => addSelection(id),
                     icon: const Icon(Icons.add),
                     label: const Text('إضافة اختيار ومعامل'),
                   ),
-                  selectionsForMarket(marketId),
+                  selectionsForMarket(id),
                 ],
               ),
             );
@@ -456,12 +394,11 @@ class _AdminPageState extends State<AdminPage>
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 Text(
-                  '${selection['label']}  |  '
-                  '${selection['odds']}  |  $result',
+                  '${selection['label']} | '
+                  '${selection['odds']} | $result',
                 ),
                 if (result == 'pending')
                   Wrap(
-                    alignment: WrapAlignment.start,
                     children: [
                       TextButton(
                         onPressed: () => setResult(id, 'won'),
@@ -485,6 +422,25 @@ class _AdminPageState extends State<AdminPage>
     );
   }
 
+  // ---------------- طلبات المحفظة ----------------
+
+  Future<void> reviewRequest(String id, bool approve) async {
+    try {
+      await db.rpc(
+        'mero_review_wallet_request',
+        params: {
+          'p_request_id': id,
+          'p_approve': approve,
+        },
+      );
+
+      message(approve ? 'تمت الموافقة على الطلب' : 'تم رفض الطلب');
+      refresh();
+    } catch (e) {
+      message('تعذر معالجة الطلب: $e');
+    }
+  }
+
   Widget requestsTab() {
     return FutureBuilder<List<Map<String, dynamic>>>(
       future: db
@@ -495,21 +451,15 @@ class _AdminPageState extends State<AdminPage>
           .eq('status', 'pending')
           .order('created_at'),
       builder: (context, snapshot) {
-        if (snapshot.connectionState ==
-            ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
         }
 
         if (snapshot.hasError) {
           return Center(
             child: Padding(
               padding: const EdgeInsets.all(16),
-              child: Text(
-                'خطأ في الطلبات: ${snapshot.error}',
-                textAlign: TextAlign.center,
-              ),
+              child: Text('خطأ في الطلبات: ${snapshot.error}'),
             ),
           );
         }
@@ -517,9 +467,7 @@ class _AdminPageState extends State<AdminPage>
         final requests = snapshot.data ?? [];
 
         if (requests.isEmpty) {
-          return const Center(
-            child: Text('لا توجد طلبات معلقة'),
-          );
+          return const Center(child: Text('لا توجد طلبات معلقة'));
         }
 
         return ListView.builder(
@@ -528,24 +476,19 @@ class _AdminPageState extends State<AdminPage>
           itemBuilder: (context, index) {
             final request = requests[index];
             final id = request['id'].toString();
-
             final amount =
                 ((request['amount'] as num?) ?? 0).toDouble();
-
             final deposit = request['kind'] == 'deposit';
             final profile = request['profiles'];
-
-            final playerName = profile is Map
-                ? profile['display_name']
-                : null;
+            final playerName =
+                profile is Map ? profile['display_name'] : null;
 
             return Card(
               color: adminSurface,
               child: Padding(
                 padding: const EdgeInsets.all(12),
                 child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.stretch,
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
                   children: [
                     Text(
                       deposit ? 'طلب إيداع' : 'طلب سحب',
@@ -554,37 +497,24 @@ class _AdminPageState extends State<AdminPage>
                         fontWeight: FontWeight.bold,
                       ),
                     ),
-                    Text(
-                      'اللاعب: ${playerName ?? request['user_id']}',
-                    ),
-                    Text(
-                      'المبلغ: ${amount.toStringAsFixed(3)} د.أ',
-                    ),
-                    Text(
-                      'الطريقة: ${request['payment_method'] ?? '-'}',
-                    ),
+                    Text('اللاعب: ${playerName ?? request['user_id']}'),
+                    Text('المبلغ: ${amount.toStringAsFixed(3)} د.أ'),
+                    Text('الطريقة: ${request['payment_method'] ?? '-'}'),
                     if ((request['payment_reference'] ?? '')
                         .toString()
                         .isNotEmpty)
-                      Text(
-                        'مرجع الدفع: ${request['payment_reference']}',
-                      ),
+                      Text('مرجع الدفع: ${request['payment_reference']}'),
                     if ((request['destination'] ?? '')
                         .toString()
                         .isNotEmpty)
-                      Text(
-                        'وجهة التحويل: ${request['destination']}',
-                      ),
-                    Text(
-                      'تاريخ الطلب: ${request['created_at']}',
-                    ),
+                      Text('وجهة التحويل: ${request['destination']}'),
+                    Text('التاريخ: ${request['created_at']}'),
                     const SizedBox(height: 10),
                     Row(
                       children: [
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () =>
-                                reviewRequest(id, true),
+                            onPressed: () => reviewRequest(id, true),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                             ),
@@ -594,8 +524,7 @@ class _AdminPageState extends State<AdminPage>
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () =>
-                                reviewRequest(id, false),
+                            onPressed: () => reviewRequest(id, false),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
                             ),
@@ -611,6 +540,352 @@ class _AdminPageState extends State<AdminPage>
           },
         );
       },
+    );
+  }
+
+  // ---------------- إدارة المستخدمين ----------------
+
+  Future<void> adjustBalance(String userId, String playerName) async {
+    final amount = TextEditingController();
+    final note = TextEditingController();
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('تعديل رصيد $playerName'),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              field(
+                amount,
+                'المبلغ: موجب للإضافة وسالب للخصم',
+                keyboard: const TextInputType.numberWithOptions(
+                  decimal: true,
+                  signed: true,
+                ),
+              ),
+              field(note, 'سبب التعديل'),
+              const Text(
+                'مثال: 10 للإضافة أو -5 للخصم',
+                style: TextStyle(color: Colors.grey),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('تأكيد التعديل'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    final value = double.tryParse(amount.text.trim());
+
+    if (value == null || value == 0 || note.text.trim().length < 3) {
+      message('أدخل مبلغاً صحيحاً وسبباً للتعديل');
+      return;
+    }
+
+    try {
+      await db.rpc(
+        'mero_admin_adjust_balance',
+        params: {
+          'p_user_id': userId,
+          'p_amount': value,
+          'p_note': note.text.trim(),
+        },
+      );
+
+      message('تم تعديل الرصيد وتسجيل العملية');
+      refresh();
+    } catch (e) {
+      message('تعذر تعديل الرصيد: $e');
+    }
+  }
+
+  Widget usersTab() {
+    return FutureBuilder<List<dynamic>>(
+      future: db.rpc('mero_admin_users'),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('تعذر تحميل المستخدمين: ${snapshot.error}'),
+            ),
+          );
+        }
+
+        final users = snapshot.data ?? [];
+
+        if (users.isEmpty) {
+          return const Center(child: Text('لا يوجد مستخدمون'));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: users.length,
+          itemBuilder: (context, index) {
+            final user = Map<String, dynamic>.from(users[index]);
+            final id = user['user_id'].toString();
+            final name = (user['display_name'] ?? 'بدون اسم').toString();
+            final balance = (user['balance'] as num?)?.toDouble() ?? 0;
+            final count = user['bets_count'] ?? 0;
+
+            return Card(
+              color: adminSurface,
+              child: Padding(
+                padding: const EdgeInsets.all(14),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      name,
+                      style: const TextStyle(
+                        color: adminGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SelectableText(
+                      'معرّف المستخدم: $id',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    Text('نوع الحساب: ${user['user_role']}'),
+                    Text(
+                      'الرصيد: ${balance.toStringAsFixed(3)} د.أ',
+                      style: const TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 16,
+                      ),
+                    ),
+                    Text('عدد الرهانات: $count'),
+                    const SizedBox(height: 8),
+                    ElevatedButton.icon(
+                      onPressed: () => adjustBalance(id, name),
+                      icon: const Icon(Icons.account_balance_wallet),
+                      label: const Text('إضافة رصيد أو خصمه'),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: adminGold,
+                        foregroundColor: Colors.black,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ---------------- متابعة الرهانات ----------------
+
+  Future<void> settleBet(String id) async {
+    try {
+      final result = await db.rpc(
+        'mero_settle_bet',
+        params: {'p_bet_id': id},
+      );
+
+      message('تمت تسوية القسيمة. مبلغ الإرجاع: $result');
+      refresh();
+    } catch (e) {
+      message('تعذرت التسوية: $e');
+    }
+  }
+
+  Widget betItems(String betId) {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: db
+          .from('bet_items')
+          .select('*, selections(label, odds, result)')
+          .eq('bet_id', betId),
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return Text('تعذر تحميل تفاصيل القسيمة: ${snapshot.error}');
+        }
+
+        if (!snapshot.hasData) {
+          return const Padding(
+            padding: EdgeInsets.all(8),
+            child: LinearProgressIndicator(),
+          );
+        }
+
+        final items = snapshot.data ?? [];
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: items.map((item) {
+            final selection = item['selections'];
+            final label = selection is Map
+                ? selection['label'] ?? 'اختيار'
+                : 'اختيار غير متاح';
+            final result = selection is Map
+                ? selection['result'] ?? 'غير معروف'
+                : 'غير معروف';
+
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 4),
+              child: Text(
+                '$label | المعامل: ${item['odds_snapshot']} | النتيجة: $result',
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  Widget betsTab() {
+    return FutureBuilder<List<Map<String, dynamic>>>(
+      future: db.from('bets').select().order('created_at', ascending: false),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (snapshot.hasError) {
+          return Center(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text('تعذر تحميل الرهانات: ${snapshot.error}'),
+            ),
+          );
+        }
+
+        final bets = snapshot.data ?? [];
+
+        if (bets.isEmpty) {
+          return const Center(child: Text('لا توجد رهانات'));
+        }
+
+        return ListView.builder(
+          padding: const EdgeInsets.all(12),
+          itemCount: bets.length,
+          itemBuilder: (context, index) {
+            final bet = bets[index];
+            final id = bet['id'].toString();
+            final status = bet['status'].toString();
+            final stake = (bet['stake'] as num?)?.toDouble() ?? 0;
+            final odds = (bet['total_odds'] as num?)?.toDouble() ?? 0;
+            final potential =
+                (bet['potential_return'] as num?)?.toDouble() ?? 0;
+
+            return Card(
+              color: adminSurface,
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: [
+                    Text(
+                      'رهان ${index + 1}',
+                      style: const TextStyle(
+                        color: adminGold,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 17,
+                      ),
+                    ),
+                    SelectableText(
+                      'رقم القسيمة: $id',
+                      style: const TextStyle(fontSize: 11),
+                    ),
+                    SelectableText('معرّف اللاعب: ${bet['user_id']}'),
+                    Text('المبلغ: ${stake.toStringAsFixed(2)} د.أ'),
+                    Text('المعامل الإجمالي: ${odds.toStringAsFixed(2)}'),
+                    Text(
+                      'العائد المحتمل: ${potential.toStringAsFixed(2)} د.أ',
+                    ),
+                    Text('الحالة: $status'),
+                    Text('التاريخ: ${bet['created_at']}'),
+                    const Divider(),
+                    const Text(
+                      'تفاصيل الاختيارات:',
+                      style: TextStyle(color: adminGold),
+                    ),
+                    betItems(id),
+                    if (status == 'open')
+                      ElevatedButton.icon(
+                        onPressed: () => settleBet(id),
+                        icon: const Icon(Icons.check_circle),
+                        label: const Text('تسوية القسيمة'),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: adminGold,
+                          foregroundColor: Colors.black,
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  // ---------------- واجهة الإدارة ----------------
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        Material(
+          color: adminSurface,
+          child: TabBar(
+            controller: tabs,
+            isScrollable: true,
+            labelColor: adminGold,
+            unselectedLabelColor: Colors.white70,
+            tabs: const [
+              Tab(
+                icon: Icon(Icons.sports_soccer),
+                text: 'المباريات',
+              ),
+              Tab(
+                icon: Icon(Icons.account_balance_wallet),
+                text: 'طلبات المحفظة',
+              ),
+              Tab(
+                icon: Icon(Icons.people),
+                text: 'المستخدمون',
+              ),
+              Tab(
+                icon: Icon(Icons.receipt_long),
+                text: 'الرهانات',
+              ),
+            ],
+          ),
+        ),
+        Expanded(
+          child: TabBarView(
+            controller: tabs,
+            children: [
+              eventsTab(),
+              requestsTab(),
+              usersTab(),
+              betsTab(),
+            ],
+          ),
+        ),
+      ],
     );
   }
 }
