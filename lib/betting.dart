@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -66,25 +67,39 @@ class _BettingPageState extends State<BettingPage> {
       return;
     }
 
+    if (slip.length > 20) {
+      showMessage('الحد الأقصى 20 اختياراً');
+      return;
+    }
+
+    if (slip.values.any((item) {
+      final odds = (item['odds'] as num?)?.toDouble() ?? 0;
+      return odds <= 1 || odds > 1000;
+    })) {
+      showMessage('يوجد معامل غير صالح في القسيمة');
+      return;
+    }
+
     setState(() => loading = true);
 
     try {
-      final result = await db.rpc(
+      await db.rpc(
         'mero_place_bet',
         params: {
           'p_selection_ids': slip.keys.toList(),
-          'p_stake_fils': stakeFils,
+          'p_stake': stakeFils / 1000.0,
         },
       );
 
       if (!mounted) return;
 
       setState(() => slip.clear());
+      stakeController.text = '1.000';
       showMessage('تم تسجيل القسيمة بنجاح');
     } on PostgrestException catch (e) {
-      showMessage(e.message);
+      showMessage('تعذر تنفيذ الرهان: ${e.message}');
     } catch (e) {
-      showMessage('حدث خطأ: $e');
+      showMessage('حدث خطأ أثناء تنفيذ الرهان');
     } finally {
       if (mounted) {
         setState(() => loading = false);
@@ -168,7 +183,7 @@ class _BettingPageState extends State<BettingPage> {
             ),
             const SizedBox(height: 8),
             Text(
-              '${event['home_name']}  ×  ${event['away_name']}',
+              '${event['home_team']}  ×  ${event['away_team']}',
               textAlign: TextAlign.center,
               style: const TextStyle(
                 fontSize: 18,
@@ -189,7 +204,7 @@ class _BettingPageState extends State<BettingPage> {
           .from('markets')
           .select()
           .eq('event_id', eventId)
-          .eq('is_open', true),
+          .eq('active', true),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const LinearProgressIndicator();
@@ -223,7 +238,8 @@ class _BettingPageState extends State<BettingPage> {
           .from('selections')
           .select()
           .eq('market_id', market['id'].toString())
-          .eq('is_active', true),
+          .eq('active', true)
+          .eq('result', 'pending'),
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const LinearProgressIndicator();
@@ -243,7 +259,7 @@ class _BettingPageState extends State<BettingPage> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              market['name'].toString(),
+              market['title'].toString(),
               style: const TextStyle(fontWeight: FontWeight.bold),
             ),
             Wrap(
@@ -260,11 +276,11 @@ class _BettingPageState extends State<BettingPage> {
                       color: selected ? gold : Colors.white24,
                     ),
                   ),
-                  onPressed: () {
-                    addSelection(option, eventId);
-                  },
+                  onPressed: loading
+                      ? null
+                      : () => addSelection(option, eventId),
                   child: Text(
-                    '${option['label']}  ${option['odds']}',
+                    '${option['name']}  ${option['odds']}',
                     style: TextStyle(
                       color: selected ? gold : Colors.white,
                     ),
@@ -299,7 +315,7 @@ class _BettingPageState extends State<BettingPage> {
               const Spacer(),
               Text('${slip.length} اختيارات'),
               IconButton(
-                onPressed: slip.isEmpty
+                onPressed: slip.isEmpty || loading
                     ? null
                     : () => setState(() => slip.clear()),
                 icon: const Icon(Icons.delete_outline),
@@ -310,13 +326,15 @@ class _BettingPageState extends State<BettingPage> {
             return Row(
               children: [
                 Expanded(
-                  child: Text(entry.value['label'].toString()),
+                  child: Text(entry.value['name'].toString()),
                 ),
                 Text('× ${entry.value['odds']}'),
                 IconButton(
-                  onPressed: () {
-                    setState(() => slip.remove(entry.key));
-                  },
+                  onPressed: loading
+                      ? null
+                      : () {
+                          setState(() => slip.remove(entry.key));
+                        },
                   icon: const Icon(Icons.close),
                 ),
               ],
@@ -324,6 +342,7 @@ class _BettingPageState extends State<BettingPage> {
           }),
           TextField(
             controller: stakeController,
+            enabled: !loading,
             keyboardType: const TextInputType.numberWithOptions(
               decimal: true,
             ),
@@ -335,7 +354,8 @@ class _BettingPageState extends State<BettingPage> {
           ),
           const SizedBox(height: 8),
           Text(
-            'المعامل الإجمالي: ${slip.isEmpty ? '—' : totalOdds.toStringAsFixed(3)}',
+            'المعامل الإجمالي: '
+            '${slip.isEmpty ? '—' : totalOdds.toStringAsFixed(3)}',
           ),
           Text(
             'العائد المحتمل: '
