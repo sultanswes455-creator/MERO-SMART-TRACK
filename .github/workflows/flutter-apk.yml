@@ -9,6 +9,7 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -21,27 +22,25 @@ jobs:
       - name: Generate Android project
         run: flutter create --platforms=android --project-name mero_ai .
 
-      - name: Set app compile SDK
-        run: |
-          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
-
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Force Android plugins to compile with API 36
+      - name: Set compile SDK 36 for app and plugins
         shell: bash
         run: |
           set -e
+
+          perl -0pi -e 's/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 36/g; s/compileSdk\s*=\s*\d+/compileSdk = 36/g; s/compileSdkVersion\s+flutter\.compileSdkVersion/compileSdkVersion 36/g; s/compileSdkVersion\s+\d+/compileSdkVersion 36/g' android/app/build.gradle.kts
+
           CACHE="$HOME/.pub-cache/hosted/pub.dev"
+
           find "$CACHE" -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -path "*/android/*" -print0 |
           while IFS= read -r -d '' file; do
-            sed -i -E \
-              -e 's/(compileSdkVersion[[:space:]]+)[0-9]+/\136/g' \
-              -e 's/(compileSdkVersion[[:space:]]+|compileSdk[[:space:]]*=[[:space:]]*)flutter.compileSdkVersion/\136/g' \
-              -e 's/(compileSdk[[:space:]]*=[[:space:]]*)[0-9]+/\136/g' \
-              "$file"
+            perl -0pi -e 's/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 36/g; s/compileSdk\s*=\s*\d+/compileSdk = 36/g; s/compileSdkVersion\s+flutter\.compileSdkVersion/compileSdkVersion 36/g; s/compileSdkVersion\s+\d+/compileSdkVersion 36/g' "$file"
           done
-          grep -R -n -E 'compileSdk|compileSdkVersion' "$CACHE"/file_picker-*/android/ || true
+
+          echo "FILE PICKER SDK:"
+          grep -nE 'compileSdk|compileSdkVersion' "$CACHE"/file_picker-*/android/build.gradle* || true
 
       - name: Build APK
         run: flutter build apk --release
