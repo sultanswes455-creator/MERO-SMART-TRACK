@@ -22,13 +22,18 @@ jobs:
       - name: Generate Android project
         run: flutter create --platforms=android --project-name mero_ai .
 
-      - name: Set Android compile SDK to 36
+      - name: Set app compile SDK
         run: |
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
           grep "compileSdk" android/app/build.gradle.kts
 
       - name: Install dependencies
         run: flutter pub get
+
+      - name: Set plugin compile SDK to 36
+        run: |
+          find "$HOME/.pub-cache/hosted/pub.dev" -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -path "*/android/*" -exec sed -i 's/flutter.compileSdkVersion/36/g' {} +
+          grep -R "compileSdk" "$HOME/.pub-cache/hosted/pub.dev/file_picker-"*/android/
 
       - name: Build APK
         run: flutter build apk --release
