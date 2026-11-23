@@ -30,6 +30,11 @@ jobs:
         run: |
           sed -i 's/android:label="[^"]*"/android:label="MERO BET"/' android/app/src/main/AndroidManifest.xml
 
+      - name: Set Android Compile SDK
+        run: |
+          sed -i 's/flutter.compileSdkVersion/36/g' android/app/build.gradle
+          sed -i 's/flutter.compileSdkVersion/36/g' android/app/build.gradle.kts
+
       - name: Get dependencies
         run: flutter pub get
 
@@ -41,3 +46,4 @@ jobs:
         with:
           name: mero-bet-apk
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
