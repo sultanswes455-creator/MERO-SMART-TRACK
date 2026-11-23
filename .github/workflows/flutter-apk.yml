@@ -11,14 +11,21 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-      - uses: subosito/flutter-action@v2
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
         with:
           channel: stable
 
       - name: Generate Android project
         run: flutter create --platforms=android --project-name mero_ai .
+
+      - name: Set Android compile SDK to 36
+        run: |
+          sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
+          grep "compileSdk" android/app/build.gradle.kts
 
       - name: Install dependencies
         run: flutter pub get
@@ -29,5 +36,6 @@ jobs:
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: MERO-AI-APK
+          name: MERO-BET-APK
           path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
