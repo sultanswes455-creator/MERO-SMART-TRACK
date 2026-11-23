@@ -1,6 +1,7 @@
 
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class ChickenRoadPage extends StatefulWidget {
@@ -12,11 +13,14 @@ class ChickenRoadPage extends StatefulWidget {
 
 class _ChickenRoadPageState extends State<ChickenRoadPage> {
   final db = Supabase.instance.client;
-  final stakeController = TextEditingController(text: '1.00');
+  final stakeController = TextEditingController(text: '0.100');
 
   static const gold = Color(0xFFFFC928);
   static const bg = Color(0xFF10151B);
   static const panel = Color(0xFF202A2B);
+
+  static const double minStake = 0.100;
+  static const double maxStake = 425.000;
 
   String? roundId;
   int step = 0;
@@ -59,6 +63,11 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
     );
   }
 
+  void setStake(double amount) {
+    if (loading || roundId != null) return;
+    stakeController.text = amount.toStringAsFixed(3);
+  }
+
   Future<void> loadActiveRound() async {
     final user = db.auth.currentUser;
     if (user == null) return;
@@ -76,6 +85,7 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
       setState(() {
         roundId = result['id'].toString();
         stake = numValue(result['stake']);
+        stakeController.text = stake.toStringAsFixed(3);
         step = numValue(result['current_step']).toInt();
         multiplier = numValue(result['multiplier'], 1);
         payout = numValue(
@@ -92,15 +102,18 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
   }
 
   Future<void> startGame() async {
-    if (loading) return;
+    if (loading || roundId != null) return;
 
-    final amount = double.tryParse(stakeController.text.trim());
+    final text = stakeController.text.trim();
+    final amount = double.tryParse(text);
+
+    final validFormat = RegExp(r'^\d+(\.\d{1,3})?$').hasMatch(text);
 
     if (amount == null ||
-        amount < 0.10 ||
-        amount > 1000 ||
-        (amount * 100).round() != amount * 100) {
-      notify('أدخل مبلغاً بين 0.10 و1000 دينار، بمنزلتين عشريتين كحد أقصى');
+        !validFormat ||
+        amount < minStake ||
+        amount > maxStake) {
+      notify('الرهان يجب أن يكون بين 0.100 و425.000 دينار، وبحد أقصى 3 منازل عشرية');
       return;
     }
 
@@ -450,9 +463,32 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
     );
   }
 
+  Widget stakeQuickButton(String label, double amount) {
+    return Expanded(
+      child: OutlinedButton(
+        onPressed: (roundId == null && !loading)
+            ? () => setStake(amount)
+            : null,
+        style: OutlinedButton.styleFrom(
+          foregroundColor: gold,
+          side: BorderSide(color: gold.withOpacity(0.55)),
+          padding: const EdgeInsets.symmetric(vertical: 11),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(9),
+          ),
+        ),
+        child: Text(
+          label,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final active = roundId != null && !gameOver;
+    final canEditStake = roundId == null && !loading;
 
     return Directionality(
       textDirection: TextDirection.rtl,
@@ -539,35 +575,126 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
                 ),
               ),
               const SizedBox(height: 15),
+
+              // لوحة الرهان
               Container(
                 padding: const EdgeInsets.all(13),
                 decoration: BoxDecoration(
                   color: panel,
                   borderRadius: BorderRadius.circular(13),
+                  border: Border.all(color: gold.withOpacity(0.25)),
                 ),
                 child: Column(
                   children: [
                     const Text(
                       'مبلغ الرهان بالدينار الأردني',
-                      style: TextStyle(color: Colors.white),
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                    const SizedBox(height: 9),
+                    const SizedBox(height: 5),
+                    const Text(
+                      'الحد الأدنى 0.100 د.أ — الحد الأقصى 425.000 د.أ',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: Colors.white54, fontSize: 11),
+                    ),
+                    const SizedBox(height: 12),
                     TextField(
                       controller: stakeController,
-                      enabled: !active && !loading,
+                      enabled: canEditStake,
                       textAlign: TextAlign.center,
-                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                      style: const TextStyle(color: Colors.white, fontSize: 19),
-                      decoration: const InputDecoration(
-                        hintText: '0.10 - 1000',
-                        hintStyle: TextStyle(color: Colors.white38),
-                        border: OutlineInputBorder(),
+                      keyboardType: const TextInputType.numberWithOptions(
+                        decimal: true,
                       ),
+                      inputFormatters: [
+                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                      ],
+                      style: const TextStyle(
+                        color: gold,
+                        fontSize: 23,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      decoration: InputDecoration(
+                        hintText: '0.100',
+                        hintStyle: const TextStyle(color: Colors.white38),
+                        suffixText: 'د.أ',
+                        suffixStyle: const TextStyle(color: gold),
+                        filled: true,
+                        fillColor: bg,
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(11),
+                          borderSide: BorderSide(color: gold.withOpacity(0.4)),
+                        ),
+                        enabledBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(11),
+                          borderSide: BorderSide(color: gold.withOpacity(0.4)),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // أزرار الحد الأدنى والأقصى
+                    Row(
+                      children: [
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: canEditStake
+                                ? () => setStake(minStake)
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF34483A),
+                              foregroundColor: Colors.white,
+                            ),
+                            child: const Text('MIN 0.100'),
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: ElevatedButton(
+                            onPressed: canEditStake
+                                ? () => setStake(maxStake)
+                                : null,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: const Color(0xFF34483A),
+                              foregroundColor: gold,
+                            ),
+                            child: const Text('MAX 425'),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+
+                    // مبالغ سريعة
+                    Row(
+                      children: [
+                        stakeQuickButton('1', 1),
+                        const SizedBox(width: 5),
+                        stakeQuickButton('2', 2),
+                        const SizedBox(width: 5),
+                        stakeQuickButton('5', 5),
+                        const SizedBox(width: 5),
+                        stakeQuickButton('10', 10),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        stakeQuickButton('25', 25),
+                        const SizedBox(width: 5),
+                        stakeQuickButton('50', 50),
+                        const SizedBox(width: 5),
+                        stakeQuickButton('100', 100),
+                        const SizedBox(width: 5),
+                        stakeQuickButton('200', 200),
+                      ],
                     ),
                   ],
                 ),
               ),
               const SizedBox(height: 14),
+
               if (roundId == null)
                 actionButton(
                   'ابدأ اللعبة',
