@@ -7,6 +7,7 @@ import 'admin.dart';
 import 'wallet.dart';
 import 'chicken_road.dart';
 import 'kamikaze.dart';
+import 'crash.dart';
 
 const supabaseUrl = 'https://gisiwcwellmuargvijuu.supabase.co';
 const supabasePublishableKey =
@@ -215,8 +216,6 @@ class MainScreen extends StatefulWidget {
 class _MainScreenState extends State<MainScreen> {
   int page = 0;
   late Future<bool> ownerFuture;
-
-  // تم إصلاح نوع الرصيد هنا
   late Future<double> balanceFuture;
 
   @override
@@ -243,7 +242,6 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  // الرصيد مخزن بالدينار الأردني مباشرة
   Future<double> getBalance() async {
     final result = await supabase.rpc('mero_balance');
 
@@ -392,6 +390,13 @@ class _MainScreenState extends State<MainScreen> {
 class CasinoPage extends StatelessWidget {
   const CasinoPage({super.key});
 
+  void openGame(BuildContext context, Widget page) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => page),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ListView(
@@ -411,6 +416,35 @@ class CasinoPage extends StatelessWidget {
           style: TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 20),
+
+        // Crash
+        Card(
+          color: surface,
+          child: ListTile(
+            contentPadding: const EdgeInsets.all(16),
+            leading: const CircleAvatar(
+              backgroundColor: Colors.deepPurple,
+              child: Icon(Icons.trending_up, color: Colors.white),
+            ),
+            title: const Text(
+              'Crash',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 18,
+              ),
+            ),
+            subtitle: const Text('لعبة المضاعفات والصعود'),
+            trailing: const Icon(Icons.arrow_forward_ios),
+            onTap: () => openGame(
+              context,
+              const CrashPage(),
+            ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Chicken Road
         Card(
           color: surface,
           child: ListTile(
@@ -428,17 +462,16 @@ class CasinoPage extends StatelessWidget {
             ),
             subtitle: const Text('20 خطوة • مخاطرة متوسطة'),
             trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const ChickenRoadPage(),
-                ),
-              );
-            },
+            onTap: () => openGame(
+              context,
+              const ChickenRoadPage(),
+            ),
           ),
         ),
+
         const SizedBox(height: 12),
+
+        // Kamikaze
         Card(
           color: surface,
           child: ListTile(
@@ -458,14 +491,10 @@ class CasinoPage extends StatelessWidget {
               '12 صفاً • 5 مربعات • اسحب في أي وقت',
             ),
             trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const KamikazePage(),
-                ),
-              );
-            },
+            onTap: () => openGame(
+              context,
+              const KamikazePage(),
+            ),
           ),
         ),
       ],
