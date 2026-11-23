@@ -25,22 +25,42 @@ jobs:
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Set compile SDK 36 for app and plugins
+      - name: Force compile SDK 36
         shell: bash
         run: |
           set -e
 
-          perl -0pi -e 's/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 36/g; s/compileSdk\s*=\s*\d+/compileSdk = 36/g; s/compileSdkVersion\s+flutter\.compileSdkVersion/compileSdkVersion 36/g; s/compileSdkVersion\s+\d+/compileSdkVersion 36/g' android/app/build.gradle.kts
-
           CACHE="$HOME/.pub-cache/hosted/pub.dev"
 
-          find "$CACHE" -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -path "*/android/*" -print0 |
+          perl -0pi -e '
+            s/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 36/g;
+            s/compileSdk\s*=\s*\d+/compileSdk = 36/g;
+            s/\bcompileSdk\s+\d+/compileSdk 36/g;
+            s/compileSdkVersion\s+flutter\.compileSdkVersion/compileSdkVersion 36/g;
+            s/compileSdkVersion\s+\d+/compileSdkVersion 36/g;
+          ' android/app/build.gradle.kts
+
+          find "$CACHE" -type f \( \
+            -name "build.gradle" -o \
+            -name "build.gradle.kts" \
+          \) -path "*/android/*" -print0 |
           while IFS= read -r -d '' file; do
-            perl -0pi -e 's/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 36/g; s/compileSdk\s*=\s*\d+/compileSdk = 36/g; s/compileSdkVersion\s+flutter\.compileSdkVersion/compileSdkVersion 36/g; s/compileSdkVersion\s+\d+/compileSdkVersion 36/g' "$file"
+            perl -0pi -e '
+              s/compileSdk\s*=\s*flutter\.compileSdkVersion/compileSdk = 36/g;
+              s/compileSdk\s*=\s*\d+/compileSdk = 36/g;
+              s/\bcompileSdk\s+\d+/compileSdk 36/g;
+              s/compileSdkVersion\s+flutter\.compileSdkVersion/compileSdkVersion 36/g;
+              s/compileSdkVersion\s+\d+/compileSdkVersion 36/g;
+            ' "$file"
           done
 
-          echo "FILE PICKER SDK:"
+          echo "VERIFY FILE PICKER:"
           grep -nE 'compileSdk|compileSdkVersion' "$CACHE"/file_picker-*/android/build.gradle* || true
+
+          if grep -qE 'compileSdk[[:space:]]+34|compileSdk[[:space:]]*=[[:space:]]*34' "$CACHE"/file_picker-*/android/build.gradle*; then
+            echo "ERROR: file_picker is still using SDK 34"
+            exit 1
+          fi
 
       - name: Build APK
         run: flutter build apk --release
