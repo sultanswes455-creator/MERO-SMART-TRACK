@@ -13,10 +13,11 @@ class _KamikazePageState extends State<KamikazePage> {
   final supabase = Supabase.instance.client;
   final stakeController = TextEditingController(text: '1.00');
 
-  static const Color background = Color(0xFF10131B);
-  static const Color surface = Color(0xFF1B202B);
+  static const Color background = Color(0xFF171A20);
+  static const Color surface = Color(0xFF242A35);
   static const Color gold = Color(0xFFFFC928);
-  static const Color blue = Color(0xFF0878E8);
+  static const Color blue = Color(0xFF087D9D);
+  static const Color green = Color(0xFF176B42);
   static const Color red = Color(0xFFE53935);
 
   static const List<double> multipliers = [
@@ -27,7 +28,6 @@ class _KamikazePageState extends State<KamikazePage> {
 
   String? roundId;
   int currentStep = 0;
-  int? lastSelectedColumn;
   int? bombColumn;
 
   double stake = 0;
@@ -40,7 +40,6 @@ class _KamikazePageState extends State<KamikazePage> {
 
   String message = 'أدخل مبلغ الرهان وابدأ اللعبة';
 
-  // الأعمدة التي اختارها اللاعب خلال الجولة الحالية.
   final Map<int, int> selectedColumns = {};
 
   @override
@@ -62,15 +61,12 @@ class _KamikazePageState extends State<KamikazePage> {
   }
 
   Map<String, dynamic> responseMap(dynamic value) {
-    if (value is Map) {
-      return Map<String, dynamic>.from(value);
-    }
+    if (value is Map) return Map<String, dynamic>.from(value);
     throw Exception('استجابة غير صحيحة من الخادم');
   }
 
   String? getRoundId(Map<String, dynamic> data) {
-    final value = data['round_id'] ?? data['id'];
-    return value?.toString();
+    return (data['round_id'] ?? data['id'])?.toString();
   }
 
   void showMessage(String value) {
@@ -83,7 +79,6 @@ class _KamikazePageState extends State<KamikazePage> {
   Future<void> loadActiveRound() async {
     try {
       final result = await supabase.rpc('mero_kamikaze_active');
-
       if (result == null || !mounted) return;
 
       final data = responseMap(result);
@@ -102,7 +97,7 @@ class _KamikazePageState extends State<KamikazePage> {
 
         multiplier = number(
           data['multiplier'],
-          currentStep > 0 ? multipliers[currentStep - 1] : 1,
+          currentStep > 0 ? multipliers[(currentStep - 1).clamp(0, 11)] : 1,
         );
 
         payout = number(
@@ -110,15 +105,12 @@ class _KamikazePageState extends State<KamikazePage> {
           stake * multiplier,
         );
 
-        lastSelectedColumn = null;
         gameOver = false;
         won = false;
-        message = 'لديك جولة مستمرة. أكمل اللعب أو اسحب أرباحك.';
+        message = 'لديك جولة مستمرة. أكمل اللعب أو اجمع أرباحك.';
       });
     } catch (e) {
-      if (mounted) {
-        showMessage('تعذر تحميل الجولة السابقة: $e');
-      }
+      if (mounted) showMessage('تعذر تحميل الجولة السابقة: $e');
     }
   }
 
@@ -131,7 +123,7 @@ class _KamikazePageState extends State<KamikazePage> {
         amount < 0.20 ||
         amount > 435.11 ||
         amount * 100 != (amount * 100).roundToDouble()) {
-      showMessage('الرهان يجب أن يكون بين 0.20 و435.11 دينار وبحد أقصى منزلتين عشريتين');
+      showMessage('الرهان بين 0.20 و435.11 دينار وبحد أقصى منزلتين عشريتين');
       return;
     }
 
@@ -158,12 +150,11 @@ class _KamikazePageState extends State<KamikazePage> {
         currentStep = 0;
         multiplier = 1;
         payout = 0;
-        lastSelectedColumn = null;
         bombColumn = null;
         selectedColumns.clear();
         gameOver = false;
         won = false;
-        message = 'اختر مربعاً من الصف الأول. انتبه للانفجار!';
+        message = 'اختر مربعاً آمناً من الصف الأول.';
       });
     } catch (e) {
       showMessage('تعذر بدء اللعبة: $e');
@@ -173,8 +164,7 @@ class _KamikazePageState extends State<KamikazePage> {
   }
 
   Future<void> chooseSquare(int column) async {
-    if (loading || roundId == null || gameOver) return;
-    if (currentStep >= 12) return;
+    if (loading || roundId == null || gameOver || currentStep >= 12) return;
 
     setState(() => loading = true);
 
@@ -202,13 +192,12 @@ class _KamikazePageState extends State<KamikazePage> {
           gameOver = true;
           won = false;
           payout = 0;
-          message = 'انفجار! خسرت الجولة.';
+          message = 'انفجار! انتهت الجولة.';
           return;
         }
 
         final oldStep = currentStep;
         selectedColumns[oldStep] = column;
-        lastSelectedColumn = column;
 
         currentStep = number(
           data['step'],
@@ -228,7 +217,7 @@ class _KamikazePageState extends State<KamikazePage> {
         if (status == 'completed' || currentStep >= 12) {
           gameOver = true;
           won = true;
-          message = 'مبروك! وصلت الطائرة إلى نهاية المسار!';
+          message = 'مبروك! وصلت إلى نهاية المسار.';
         } else {
           message = 'نجوت! اختر مربعاً من الصف التالي.';
         }
@@ -241,9 +230,7 @@ class _KamikazePageState extends State<KamikazePage> {
   }
 
   Future<void> cashOut() async {
-    if (loading || roundId == null || currentStep < 1 || gameOver) {
-      return;
-    }
+    if (loading || roundId == null || currentStep < 1 || gameOver) return;
 
     setState(() => loading = true);
 
@@ -262,11 +249,10 @@ class _KamikazePageState extends State<KamikazePage> {
         payout = number(data['payout'], payout);
         gameOver = true;
         won = true;
-        message =
-            'تم سحب الأرباح بنجاح: ${payout.toStringAsFixed(2)} د.أ';
+        message = 'تم جمع الأرباح: ${payout.toStringAsFixed(3)} JOD';
       });
     } catch (e) {
-      showMessage('تعذر سحب الأرباح: $e');
+      showMessage('تعذر جمع الأرباح: $e');
     } finally {
       if (mounted) setState(() => loading = false);
     }
@@ -276,7 +262,6 @@ class _KamikazePageState extends State<KamikazePage> {
     setState(() {
       roundId = null;
       currentStep = 0;
-      lastSelectedColumn = null;
       bombColumn = null;
       stake = 0;
       multiplier = 1;
@@ -288,38 +273,32 @@ class _KamikazePageState extends State<KamikazePage> {
     });
   }
 
-  Widget infoBox(String title, String value) {
-    return Expanded(
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 3),
-        padding: const EdgeInsets.symmetric(
-          vertical: 13,
-          horizontal: 4,
-        ),
-        decoration: BoxDecoration(
-          color: surface,
-          borderRadius: BorderRadius.circular(13),
-          border: Border.all(color: gold.withOpacity(0.25)),
-        ),
-        child: Column(
-          children: [
-            Text(
-              title,
-              style: const TextStyle(
-                color: Colors.white70,
-                fontSize: 12,
-              ),
+  void showHowToPlay() {
+    showDialog<void>(
+      context: context,
+      builder: (dialogContext) => Directionality(
+        textDirection: TextDirection.rtl,
+        child: AlertDialog(
+          backgroundColor: surface,
+          title: const Text(
+            'كيفية اللعب',
+            style: TextStyle(color: gold, fontWeight: FontWeight.bold),
+          ),
+          content: const SingleChildScrollView(
+            child: Text(
+              'ساعد الطيار الياباني على تدمير بارجة العدو!\n\n'
+              'ضع الرهان قبل بداية اللعبة. الحد الأدنى 0.20 JOD والحد الأقصى 435.11 JOD.\n\n'
+              'تظهر شبكة بها 12 صفاً و5 مربعات في كل صف. تطلق سفينة العدو طلقة واحدة في كل صف.\n\n'
+              'اختر مربعاً آمناً للانتقال إلى المستوى التالي وزيادة المكاسب.\n\n'
+              'إذا اخترت مربع الطلقة تنتهي اللعبة وتخسر الرهان.\n\n'
+              'يمكنك جمع أرباحك بعد النجاة من أي صف.',
+              style: TextStyle(color: Colors.white, height: 1.5),
             ),
-            const SizedBox(height: 7),
-            FittedBox(
-              child: Text(
-                value,
-                style: const TextStyle(
-                  color: gold,
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
-                ),
-              ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('إغلاق', style: TextStyle(color: gold)),
             ),
           ],
         ),
@@ -327,17 +306,34 @@ class _KamikazePageState extends State<KamikazePage> {
     );
   }
 
-  Widget plane() {
-    return const Icon(
-      Icons.flight,
-      color: red,
-      size: 27,
+  Widget multiplierLabel(int row) {
+    final value = multipliers[row];
+    final reached = row < currentStep;
+
+    return Container(
+      width: 53,
+      height: 42,
+      alignment: Alignment.center,
+      decoration: BoxDecoration(
+        color: reached ? green : const Color(0xFF18344B),
+        borderRadius: BorderRadius.circular(7),
+        border: Border.all(
+          color: row == currentStep && !gameOver ? gold : Colors.white54,
+        ),
+      ),
+      child: Text(
+        'x${value == value.roundToDouble() ? value.toStringAsFixed(0) : value.toString()}',
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
     );
   }
 
   Widget squareContent(int row, int column) {
     final selected = selectedColumns[row] == column;
-    final isCurrentRow = row == currentStep;
     final isBomb = gameOver &&
         !won &&
         row == currentStep &&
@@ -347,159 +343,26 @@ class _KamikazePageState extends State<KamikazePage> {
       return const Icon(
         Icons.local_fire_department,
         color: Colors.white,
-        size: 29,
+        size: 27,
       );
     }
 
     if (selected) {
-      return plane();
+      return const Icon(Icons.flight, color: red, size: 25);
     }
 
-    if (isCurrentRow && !gameOver && roundId != null) {
-      return const Icon(
-        Icons.add,
-        color: Colors.white70,
-        size: 23,
-      );
+    if (row == currentStep && !gameOver && roundId != null) {
+      return const Icon(Icons.add, color: Colors.white70, size: 20);
     }
 
     if (row < currentStep) {
-      return const Icon(
-        Icons.check,
-        color: Colors.white,
-        size: 20,
-      );
+      return const Icon(Icons.check, color: Colors.white, size: 18);
     }
 
     return const SizedBox.shrink();
   }
 
-  Widget gameBoard() {
-    return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF151C29),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(
-          color: gold.withOpacity(0.3),
-        ),
-      ),
-      child: Column(
-        children: [
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.flight, color: red, size: 22),
-              SizedBox(width: 8),
-              Text(
-                'KAMIKAZE',
-                style: TextStyle(
-                  color: gold,
-                  fontWeight: FontWeight.w900,
-                  fontSize: 19,
-                  letterSpacing: 2,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-
-          for (int row = 11; row >= 0; row--)
-            Padding(
-              padding: const EdgeInsets.symmetric(vertical: 3),
-              child: Row(
-                children: [
-                  SizedBox(
-                    width: 28,
-                    child: Text(
-                      '${row + 1}',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(
-                        color: row < currentStep
-                            ? gold
-                            : Colors.white54,
-                        fontSize: 11,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                  for (int column = 1; column <= 5; column++)
-                    Expanded(
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 3,
-                        ),
-                        child: AspectRatio(
-                          aspectRatio: 1.18,
-                          child: GestureDetector(
-                            onTap: !loading &&
-                                    !gameOver &&
-                                    roundId != null &&
-                                    row == currentStep
-                                ? () => chooseSquare(column)
-                                : null,
-                            child: AnimatedContainer(
-                              duration: const Duration(
-                                milliseconds: 220,
-                              ),
-                              decoration: BoxDecoration(
-                                color: squareContentIsSelected(row, column)
-                                    ? const Color(0xFF174A75)
-                                    : blue,
-                                borderRadius: BorderRadius.circular(8),
-                                border: Border.all(
-                                  color: squareContentIsSelected(row, column)
-                                      ? gold
-                                      : Colors.white24,
-                                  width: squareContentIsSelected(row, column)
-                                      ? 2
-                                      : 1,
-                                ),
-                                boxShadow: [
-                                  BoxShadow(
-                                    color: blue.withOpacity(0.25),
-                                    blurRadius: 5,
-                                  ),
-                                ],
-                              ),
-                              child: Center(
-                                child: squareContent(row, column),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-          const SizedBox(height: 10),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(Icons.flight, color: red, size: 18),
-              SizedBox(width: 5),
-              Text(
-                'الطائرة',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-              SizedBox(width: 20),
-              Icon(Icons.local_fire_department,
-                  color: Colors.white, size: 18),
-              SizedBox(width: 5),
-              Text(
-                'الانفجار',
-                style: TextStyle(color: Colors.white70, fontSize: 12),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-
-  bool squareContentIsSelected(int row, int column) {
+  bool isSelected(int row, int column) {
     return selectedColumns[row] == column ||
         (gameOver &&
             !won &&
@@ -507,39 +370,95 @@ class _KamikazePageState extends State<KamikazePage> {
             bombColumn == column);
   }
 
-  Widget multiplierStrip() {
-    return Wrap(
-      alignment: WrapAlignment.center,
-      spacing: 6,
-      runSpacing: 7,
-      children: [
-        for (int i = 0; i < multipliers.length; i++)
-          Container(
-            padding: const EdgeInsets.symmetric(
-              horizontal: 9,
-              vertical: 7,
-            ),
-            decoration: BoxDecoration(
-              color: i < currentStep
-                  ? const Color(0xFF176B42)
-                  : surface,
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: i == currentStep && !gameOver
-                    ? gold
-                    : Colors.white12,
+  Widget gameBoard() {
+    return Container(
+      padding: const EdgeInsets.all(7),
+      decoration: BoxDecoration(
+        color: const Color(0xFF075E7C),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white, width: 3),
+      ),
+      child: Column(
+        children: [
+          for (int row = 11; row >= 0; row--)
+            SizedBox(
+              height: 46,
+              child: Directionality(
+                textDirection: TextDirection.ltr,
+                child: Row(
+                  children: [
+                    multiplierLabel(row),
+                    Expanded(
+                      child: Row(
+                        children: [
+                          for (int column = 1; column <= 5; column++)
+                            Expanded(
+                              child: GestureDetector(
+                                onTap: !loading &&
+                                        !gameOver &&
+                                        roundId != null &&
+                                        row == currentStep
+                                    ? () => chooseSquare(column)
+                                    : null,
+                                child: AnimatedContainer(
+                                  duration: const Duration(milliseconds: 180),
+                                  margin: const EdgeInsets.all(1),
+                                  decoration: BoxDecoration(
+                                    color: isSelected(row, column)
+                                        ? const Color(0xFF174A75)
+                                        : blue,
+                                    border: Border.all(
+                                      color: isSelected(row, column)
+                                          ? gold
+                                          : Colors.white70,
+                                      width: isSelected(row, column) ? 2 : 1,
+                                    ),
+                                  ),
+                                  child: Center(
+                                    child: squareContent(row, column),
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
-            child: Text(
-              'x${multipliers[i] == multipliers[i].roundToDouble() ? multipliers[i].toStringAsFixed(0) : multipliers[i].toString()}',
-              style: TextStyle(
-                color: i < currentStep ? Colors.white : Colors.white70,
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
+        ],
+      ),
+    );
+  }
+
+  Widget infoBox(String title, String value) {
+    return Expanded(
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 3),
+        padding: const EdgeInsets.symmetric(vertical: 11, horizontal: 3),
+        decoration: BoxDecoration(
+          color: surface,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: gold.withOpacity(0.25)),
+        ),
+        child: Column(
+          children: [
+            Text(title, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+            const SizedBox(height: 5),
+            FittedBox(
+              child: Text(
+                value,
+                style: const TextStyle(
+                  color: gold,
+                  fontSize: 15,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
-          ),
-      ],
+          ],
+        ),
+      ),
     );
   }
 
@@ -550,16 +469,15 @@ class _KamikazePageState extends State<KamikazePage> {
     Color textColor = Colors.black,
   }) {
     return SizedBox(
-      height: 52,
+      height: 51,
       width: double.infinity,
       child: ElevatedButton(
         onPressed: loading ? null : onPressed,
         style: ElevatedButton.styleFrom(
           backgroundColor: color,
           foregroundColor: textColor,
-          disabledBackgroundColor: Colors.grey.shade700,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(13),
+            borderRadius: BorderRadius.circular(11),
           ),
         ),
         child: loading
@@ -591,98 +509,68 @@ class _KamikazePageState extends State<KamikazePage> {
       child: Scaffold(
         backgroundColor: background,
         appBar: AppBar(
-          backgroundColor: surface,
+          backgroundColor: Colors.white,
+          foregroundColor: const Color(0xFF245E62),
           centerTitle: true,
           title: const Text(
             'KAMIKAZE',
             style: TextStyle(
-              color: gold,
+              color: red,
               fontWeight: FontWeight.w900,
               letterSpacing: 2,
             ),
           ),
+          actions: [
+            IconButton(
+              onPressed: showHowToPlay,
+              icon: const Icon(Icons.help_outline),
+            ),
+          ],
         ),
         body: SafeArea(
           child: ListView(
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             children: [
               Container(
-                padding: const EdgeInsets.all(17),
+                padding: const EdgeInsets.symmetric(vertical: 13),
                 decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [
-                      Color(0xFF183C61),
-                      Color(0xFF172D43),
-                      surface,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(17),
-                  border: Border.all(
-                    color: gold.withOpacity(0.3),
-                  ),
+                  color: const Color(0xFF075B58),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.white, width: 2),
                 ),
-                child: const Column(
+                child: Column(
                   children: [
-                    Icon(
-                      Icons.flight,
-                      color: red,
-                      size: 58,
+                    const Text(
+                      'الأرباح الحالية',
+                      style: TextStyle(color: Colors.white, fontSize: 15),
                     ),
-                    SizedBox(height: 8),
+                    const SizedBox(height: 5),
                     Text(
-                      'KAMIKAZE',
-                      style: TextStyle(
-                        color: gold,
-                        fontSize: 24,
+                      'JOD ${payout.toStringAsFixed(3)}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 23,
                         fontWeight: FontWeight.w900,
-                        letterSpacing: 2,
                       ),
-                    ),
-                    SizedBox(height: 6),
-                    Text(
-                      'اختر المربع الآمن واصعد بالطائرة!',
-                      textAlign: TextAlign.center,
-                      style: TextStyle(color: Colors.white70),
-                    ),
-                    SizedBox(height: 5),
-                    Text(
-                      '12 صفاً • 5 مربعات في كل صف',
-                      style: TextStyle(color: Colors.white54),
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 15),
-
-              Row(
-                children: [
-                  infoBox('الصف', '$currentStep / 12'),
-                  infoBox('المضاعف', 'x${multiplier.toStringAsFixed(2)}'),
-                  infoBox('الربح', '${payout.toStringAsFixed(2)} د.أ'),
-                ],
-              ),
-
-              const SizedBox(height: 18),
-
-              const Text(
-                'مضاعفات اللعبة',
-                textAlign: TextAlign.center,
-                style: TextStyle(
-                  color: gold,
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
+              const SizedBox(height: 13),
+              const Center(
+                child: Text(
+                  'KAMIKAZE',
+                  style: TextStyle(
+                    color: red,
+                    fontSize: 29,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 2,
+                  ),
                 ),
               ),
               const SizedBox(height: 10),
-              multiplierStrip(),
-
-              const SizedBox(height: 18),
-
               gameBoard(),
-
               const SizedBox(height: 12),
-
               Text(
                 message,
                 textAlign: TextAlign.center,
@@ -691,84 +579,89 @@ class _KamikazePageState extends State<KamikazePage> {
                       ? (won ? Colors.greenAccent : Colors.redAccent)
                       : Colors.white,
                   fontWeight: FontWeight.bold,
-                  fontSize: 14,
                 ),
               ),
-
-              const SizedBox(height: 16),
-
+              const SizedBox(height: 12),
               Container(
-                padding: const EdgeInsets.all(15),
+                padding: const EdgeInsets.all(13),
                 decoration: BoxDecoration(
                   color: surface,
-                  borderRadius: BorderRadius.circular(15),
+                  borderRadius: BorderRadius.circular(12),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     const Text(
-                      'مبلغ الرهان بالدينار الأردني',
-                      style: TextStyle(color: Colors.white),
-                    ),
-                    const SizedBox(height: 9),
-                    TextField(
-                      controller: stakeController,
-                      enabled: !active && !loading,
-                      keyboardType: const TextInputType.numberWithOptions(
-                        decimal: true,
-                      ),
-                      decoration: const InputDecoration(
-                        prefixText: 'د.أ ',
-                        border: OutlineInputBorder(),
-                        hintText: '0.20 - 435.11',
+                      'ضع رهان',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                     const SizedBox(height: 8),
-                    const Text(
-                      'الحد الأدنى 0.20 د.أ • الحد الأقصى 435.11 د.أ',
-                      style: TextStyle(
-                        color: Colors.white54,
-                        fontSize: 11,
+                    TextField(
+                      controller: stakeController,
+                      enabled: !active && !loading,
+                      textAlign: TextAlign.center,
+                      keyboardType: const TextInputType.numberWithOptions(decimal: true),
+                      style: const TextStyle(color: Colors.white, fontSize: 19),
+                      decoration: const InputDecoration(
+                        prefixText: 'JOD ',
+                        prefixStyle: TextStyle(color: gold),
+                        hintText: '0.20 - 435.11',
+                        hintStyle: TextStyle(color: Colors.white38),
+                        border: OutlineInputBorder(),
                       ),
+                    ),
+                    const SizedBox(height: 7),
+                    const Text(
+                      'الحد الأدنى 0.20 JOD • الحد الأقصى 435.11 JOD',
+                      style: TextStyle(color: Colors.white60, fontSize: 11),
                     ),
                   ],
                 ),
               ),
-
-              const SizedBox(height: 14),
-
+              const SizedBox(height: 12),
               if (roundId == null)
                 actionButton(
-                  label: 'ابدأ اللعبة',
+                  label: 'العب',
                   onPressed: startGame,
-                ),
-
-              if (active) ...[
-                actionButton(
-                  label: 'اختيار مربع من الصف التالي',
-                  onPressed: currentStep < 12
-                      ? () => showMessage('اضغط أحد المربعات الزرقاء في اللوحة')
-                      : null,
-                  color: blue,
+                  color: green,
                   textColor: Colors.white,
                 ),
-                const SizedBox(height: 10),
+              if (active)
                 actionButton(
-                  label: 'اسحب أرباحك الآن',
+                  label: 'اجمع',
                   onPressed: currentStep >= 1 ? cashOut : null,
-                  color: const Color(0xFF1E9B61),
+                  color: green,
                   textColor: Colors.white,
                 ),
-              ],
-
-              if (gameOver) ...[
+              if (gameOver)
                 actionButton(
                   label: won ? 'جولة جديدة' : 'العب مرة أخرى',
                   onPressed: resetGame,
+                  color: green,
+                  textColor: Colors.white,
                 ),
-              ],
-
-              const SizedBox(height: 20),
+              const SizedBox(height: 8),
+              OutlinedButton.icon(
+                onPressed: showHowToPlay,
+                icon: const Icon(Icons.help_outline),
+                label: const Text('كيفية اللعب'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: Colors.white,
+                  side: const BorderSide(color: Colors.white54),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  infoBox('الصف', '$currentStep / 12'),
+                  infoBox('المضاعف', 'x${multiplier.toStringAsFixed(2)}'),
+                  infoBox('الربح', '${payout.toStringAsFixed(3)} د.أ'),
+                ],
+              ),
             ],
           ),
         ),
