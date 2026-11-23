@@ -1,230 +1,252 @@
-  // ---------------- طلبات المحفظة ----------------
 
-  Future<void> viewProof(String path) async {
-    try {
-      final signedUrl = await db.storage
-          .from('wallet-proofs')
-          .createSignedUrl(path, 600);
+import 'package:flutter/material.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 
-      if (!mounted) return;
-      final isPdf = path.toLowerCase().endsWith('.pdf');
+const adminGold = Color(0xFFFFC928);
+const adminSurface = Color(0xFF1B202B);
 
-      await showDialog<void>(
-        context: context,
-        builder: (dialogContext) => AlertDialog(
-          title: const Text('إيصال التحويل'),
-          content: SizedBox(
-            width: double.maxFinite,
-            child: isPdf
-                ? SelectableText(
-                    'إيصال PDF. انسخ الرابط وافتحه:\n$signedUrl',
-                  )
-                : InteractiveViewer(
-                    child: Image.network(
-                      signedUrl,
-                      fit: BoxFit.contain,
-                      loadingBuilder: (context, child, progress) {
-                        if (progress == null) return child;
-                        return const Center(
-                          child: CircularProgressIndicator(),
-                        );
-                      },
-                      errorBuilder: (context, error, stack) =>
-                          const Text('تعذر عرض صورة الإيصال'),
-                    ),
-                  ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('إغلاق'),
-            ),
-          ],
-        ),
-      );
-    } catch (e) {
-      message('تعذر فتح الإيصال: $e');
-    }
+class AdminPage extends StatefulWidget {
+  const AdminPage({super.key});
+
+  @override
+  State<AdminPage> createState() => _AdminPageState();
+}
+
+class _AdminPageState extends State<AdminPage>
+    with SingleTickerProviderStateMixin {
+  final db = Supabase.instance.client;
+  late final TabController tabs;
+
+  @override
+  void initState() {
+    super.initState();
+    tabs = TabController(length: 4, vsync: this);
   }
 
-  Future<void> reviewRequest(String id, bool approve) async {
-    try {
-      await db.rpc(
-        'mero_review_wallet_request',
-        params: {
-          'p_request_id': id,
-          'p_approve': approve,
-          'p_note': approve
-              ? 'تمت مراجعة الإيصال والموافقة'
-              : 'تم رفض الطلب بعد المراجعة',
-        },
-      );
-
-      message(
-        approve
-            ? 'تمت الموافقة على الطلب وإضافة الرصيد'
-            : 'تم رفض الطلب',
-      );
-      refresh();
-    } catch (e) {
-      message('تعذر معالجة الطلب: $e');
-    }
+  @override
+  void dispose() {
+    tabs.dispose();
+    super.dispose();
   }
 
-  Widget requestsTab() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: db
-          .from('wallet_requests')
-          .select(
-            '*, profiles!wallet_requests_user_id_fkey(display_name)',
-          )
-          .eq('status', 'pending')
-          .order('created_at'),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState == ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text('خطأ في الطلبات: ${snapshot.error}'),
-            ),
-          );
-        }
-
-        final requests = snapshot.data ?? [];
-
-        if (requests.isEmpty) {
-          return const Center(
-            child: Text('لا توجد طلبات معلقة'),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: requests.length,
-          itemBuilder: (context, index) {
-            final request = requests[index];
-            final id = request['id'].toString();
-
-            final fils =
-                (request['amount_fils'] as num?)?.toDouble() ?? 0;
-            final amount = fils / 1000;
-
-            final deposit = request['kind'] == 'deposit';
-            final profile = request['profiles'];
-            final playerName =
-                profile is Map ? profile['display_name'] : null;
-
-            final method =
-                (request['method'] ?? '-').toString();
-
-            final senderDetails =
-                (request['payment_reference'] ?? '').toString();
-
-            final destination =
-                (request['destination'] ?? '').toString();
-
-            final proofPath =
-                (request['proof_path'] ?? '').toString();
-
-            return Card(
-              color: adminSurface,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      deposit ? 'طلب إيداع' : 'طلب سحب',
-                      style: const TextStyle(
-                        color: adminGold,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-
-                    Text(
-                      'اللاعب: ${playerName ?? request['user_id']}',
-                    ),
-
-                    Text(
-                      'المبلغ: ${amount.toStringAsFixed(3)} د.أ',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-
-                    Text('طريقة التحويل: $method'),
-
-                    if (senderDetails.isNotEmpty)
-                      Text('بيانات المرسل: $senderDetails'),
-
-                    if (destination.isNotEmpty)
-                      Text('وجهة السحب: $destination'),
-
-                    if (proofPath.isNotEmpty) ...[
-                      const SizedBox(height: 8),
-                      OutlinedButton.icon(
-                        onPressed: () => viewProof(proofPath),
-                        icon: const Icon(Icons.receipt_long),
-                        label: const Text(
-                          'عرض إيصال التحويل',
-                        ),
-                      ),
-                    ] else if (deposit) ...[
-                      const Text(
-                        'لم يرفق اللاعب إيصالاً',
-                        style: TextStyle(
-                          color: Colors.orangeAccent,
-                        ),
-                      ),
-                    ],
-
-                    Text('التاريخ: ${request['created_at']}'),
-
-                    const SizedBox(height: 10),
-
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () =>
-                                reviewRequest(id, true),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.green,
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('موافقة'),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton(
-                            onPressed: () =>
-                                reviewRequest(id, false),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.red,
-                              foregroundColor: Colors.white,
-                            ),
-                            child: const Text('رفض'),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
+  void message(String value) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(value)),
     );
   }
+
+  Widget field(
+    TextEditingController c,
+    String label, {
+    TextInputType? keyboard,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: TextField(
+        controller: c,
+        keyboardType: keyboard,
+        decoration: InputDecoration(
+          labelText: label,
+          border: const OutlineInputBorder(),
+        ),
+      ),
+    );
+  }
+
+  Future<void> refresh() async {
+    if (mounted) setState(() {});
+  }
+
+  // ---------------- المباريات ----------------
+
+  Future<void> addEvent() async {
+    final sport = TextEditingController(text: 'كرة القدم');
+    final league = TextEditingController();
+    final home = TextEditingController();
+    final away = TextEditingController();
+    final date = TextEditingController(
+      text: DateTime.now()
+          .add(const Duration(days: 1))
+          .toIso8601String()
+          .substring(0, 16),
+    );
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('إضافة مباراة'),
+        content: SingleChildScrollView(
+          child: Column(
+            children: [
+              field(sport, 'الرياضة'),
+              field(league, 'الدوري أو البطولة'),
+              field(home, 'الفريق الأول'),
+              field(away, 'الفريق الثاني'),
+              field(date, 'الموعد: 2026-11-23T20:30'),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    try {
+      if (home.text.trim().isEmpty ||
+          away.text.trim().isEmpty ||
+          league.text.trim().isEmpty) {
+        message('أكمل بيانات المباراة');
+        return;
+      }
+
+      final start = DateTime.parse(date.text.trim());
+
+      await db.from('events').insert({
+        'sport': sport.text.trim(),
+        'league': league.text.trim(),
+        'home_name': home.text.trim(),
+        'away_name': away.text.trim(),
+        'starts_at': start.toUtc().toIso8601String(),
+        'status': 'upcoming',
+      });
+
+      message('تمت إضافة المباراة');
+      refresh();
+    } catch (e) {
+      message('تعذر إضافة المباراة: $e');
+    }
+  }
+
+  Future<void> addMarket(String eventId) async {
+    final name = TextEditingController(text: 'الفائز بالمباراة');
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('إضافة سوق'),
+        content: field(name, 'اسم السوق'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('إضافة'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true || name.text.trim().isEmpty) return;
+
+    try {
+      await db.from('markets').insert({
+        'event_id': eventId,
+        'name': name.text.trim(),
+        'is_open': true,
+      });
+      message('تمت إضافة السوق');
+      refresh();
+    } catch (e) {
+      message('خطأ: $e');
+    }
+  }
+
+  Future<void> addSelection(String marketId) async {
+    final label = TextEditingController();
+    final odds = TextEditingController(text: '2.00');
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('إضافة اختيار'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            field(label, 'اسم الاختيار'),
+            field(odds, 'المعامل'),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('إلغاء'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('حفظ'),
+          ),
+        ],
+      ),
+    );
+
+    if (ok != true) return;
+
+    final value = double.tryParse(odds.text.trim());
+
+    if (label.text.trim().isEmpty ||
+        value == null ||
+        value <= 1 ||
+        value > 1000) {
+      message('تحقق من الاسم والمعامل');
+      return;
+    }
+
+    try {
+      await db.from('selections').insert({
+        'market_id': marketId,
+        'label': label.text.trim(),
+        'odds': value,
+        'is_active': true,
+        'result': 'pending',
+      });
+      message('تمت إضافة الاختيار');
+      refresh();
+    } catch (e) {
+      message('خطأ: $e');
+    }
+  }
+
+  Future<void> setResult(String id, String result) async {
+    try {
+      await db.from('selections').update({
+        'result': result,
+        'is_active': false,
+      }).eq('id', id);
+
+      message('تم حفظ النتيجة');
+      refresh();
+    } catch (e) {
+      message('تعذر حفظ النتيجة: $e');
+    }
+  }
+
+  Future<void> closeEvent(String id) async {
+    try {
+      await db.from('events').update({
+        'status': 'finished',
+      }).eq('id', id);
+
+      message('تم إنهاء المباراة');
+      refresh();
+    } catch (e) {
+      message('تعذر إنهاء المباراة: $e');
+    }
+  }
+
+  Widget eventsTab() {
+    return Column(
+      children: [
+        Padding(
