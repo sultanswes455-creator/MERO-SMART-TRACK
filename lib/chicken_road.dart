@@ -13,14 +13,14 @@ class ChickenRoadPage extends StatefulWidget {
 
 class _ChickenRoadPageState extends State<ChickenRoadPage> {
   final db = Supabase.instance.client;
-  final stakeController = TextEditingController(text: '0.100');
+  final stakeController = TextEditingController(text: '0.10');
 
   static const gold = Color(0xFFFFC928);
   static const bg = Color(0xFF10151B);
   static const panel = Color(0xFF202A2B);
 
-  static const double minStake = 0.100;
-  static const double maxStake = 425.000;
+  static const double minStake = 0.10;
+  static const double maxStake = 435.00;
 
   String? roundId;
   int step = 0;
@@ -65,7 +65,7 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
 
   void setStake(double amount) {
     if (loading || roundId != null) return;
-    stakeController.text = amount.toStringAsFixed(3);
+    stakeController.text = amount.toStringAsFixed(2);
   }
 
   Future<void> loadActiveRound() async {
@@ -85,7 +85,7 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
       setState(() {
         roundId = result['id'].toString();
         stake = numValue(result['stake']);
-        stakeController.text = stake.toStringAsFixed(3);
+        stakeController.text = stake.toStringAsFixed(2);
         step = numValue(result['current_step']).toInt();
         multiplier = numValue(result['multiplier'], 1);
         payout = numValue(
@@ -107,13 +107,13 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
     final text = stakeController.text.trim();
     final amount = double.tryParse(text);
 
-    final validFormat = RegExp(r'^\d+(\.\d{1,3})?$').hasMatch(text);
+    final validFormat = RegExp(r'^\d+(\.\d{1,2})?$').hasMatch(text);
 
     if (amount == null ||
         !validFormat ||
         amount < minStake ||
         amount > maxStake) {
-      notify('الرهان يجب أن يكون بين 0.100 و425.000 دينار، وبحد أقصى 3 منازل عشرية');
+      notify('الرهان يجب أن يكون بين 0.10 و435.00 دينار، وبحد أقصى منزلتين عشريتين');
       return;
     }
 
@@ -228,6 +228,7 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
       payout = 0;
       gameOver = false;
       won = false;
+      stakeController.text = '0.10';
       message = 'أدخل مبلغ الرهان وابدأ اللعب';
     });
   }
@@ -543,7 +544,7 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
                 children: [
                   stat('الخطوة', '$step / 20'),
                   stat('المضاعف', '${multiplier.toStringAsFixed(2)}x'),
-                  stat('الأرباح', '${payout.toStringAsFixed(3)} د.أ'),
+                  stat('الأرباح', '${payout.toStringAsFixed(2)} د.أ'),
                 ],
               ),
               const SizedBox(height: 16),
@@ -575,8 +576,6 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
                 ),
               ),
               const SizedBox(height: 15),
-
-              // لوحة الرهان
               Container(
                 padding: const EdgeInsets.all(13),
                 decoration: BoxDecoration(
@@ -595,7 +594,7 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
                     ),
                     const SizedBox(height: 5),
                     const Text(
-                      'الحد الأدنى 0.100 د.أ — الحد الأقصى 425.000 د.أ',
+                      'الحد الأدنى 0.10 د.أ — الحد الأقصى 435.00 د.أ',
                       textAlign: TextAlign.center,
                       style: TextStyle(color: Colors.white54, fontSize: 11),
                     ),
@@ -608,7 +607,9 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
                         decimal: true,
                       ),
                       inputFormatters: [
-                        FilteringTextInputFormatter.allow(RegExp(r'[0-9.]')),
+                        FilteringTextInputFormatter.allow(
+                          RegExp(r'^\d*\.?\d{0,2}'),
+                        ),
                       ],
                       style: const TextStyle(
                         color: gold,
@@ -616,7 +617,7 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
                         fontWeight: FontWeight.bold,
                       ),
                       decoration: InputDecoration(
-                        hintText: '0.100',
+                        hintText: '0.10',
                         hintStyle: const TextStyle(color: Colors.white38),
                         suffixText: 'د.أ',
                         suffixStyle: const TextStyle(color: gold),
@@ -633,8 +634,6 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
                       ),
                     ),
                     const SizedBox(height: 10),
-
-                    // أزرار الحد الأدنى والأقصى
                     Row(
                       children: [
                         Expanded(
@@ -646,7 +645,7 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
                               backgroundColor: const Color(0xFF34483A),
                               foregroundColor: Colors.white,
                             ),
-                            child: const Text('MIN 0.100'),
+                            child: const Text('MIN 0.10'),
                           ),
                         ),
                         const SizedBox(width: 10),
@@ -659,14 +658,12 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
                               backgroundColor: const Color(0xFF34483A),
                               foregroundColor: gold,
                             ),
-                            child: const Text('MAX 425'),
+                            child: const Text('MAX 435'),
                           ),
                         ),
                       ],
                     ),
                     const SizedBox(height: 8),
-
-                    // مبالغ سريعة
                     Row(
                       children: [
                         stakeQuickButton('1', 1),
@@ -694,7 +691,6 @@ class _ChickenRoadPageState extends State<ChickenRoadPage> {
                 ),
               ),
               const SizedBox(height: 14),
-
               if (roundId == null)
                 actionButton(
                   'ابدأ اللعبة',
