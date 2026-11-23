@@ -3,13 +3,11 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 import 'betting.dart';
 import 'admin.dart';
 import 'wallet.dart';
-import 'chicken_road.dart';
-import 'kamikaze.dart';
-import 'crash.dart';
 
 const supabaseUrl = 'https://gisiwcwellmuargvijuu.supabase.co';
 const supabasePublishableKey =
@@ -18,6 +16,8 @@ const supabasePublishableKey =
 const gold = Color(0xFFFFC928);
 const background = Color(0xFF10131B);
 const surface = Color(0xFF1B202B);
+
+final supabase = Supabase.instance.client;
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -29,8 +29,6 @@ Future<void> main() async {
 
   runApp(const MeroBetApp());
 }
-
-final supabase = Supabase.instance.client;
 
 class MeroBetApp extends StatelessWidget {
   const MeroBetApp({super.key});
@@ -68,7 +66,6 @@ class AuthGate extends StatelessWidget {
         if (supabase.auth.currentSession != null) {
           return const MainScreen();
         }
-
         return const LoginPage();
       },
     );
@@ -234,7 +231,6 @@ class _MainScreenState extends State<MainScreen> {
       const Duration(seconds: 5),
       (_) {
         if (!mounted) return;
-
         setState(() {
           balanceFuture = getBalance();
         });
@@ -265,23 +261,13 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  // mero_balance returns JOD directly.
   Future<double> getBalance() async {
     final result = await supabase.rpc('mero_balance');
 
     if (result == null) return 0;
-
     if (result is num) return result.toDouble();
 
     return double.tryParse(result.toString()) ?? 0;
-  }
-
-  void refreshHeaderBalance() {
-    if (!mounted) return;
-
-    setState(() {
-      balanceFuture = getBalance();
-    });
   }
 
   void openDeposit() {
@@ -368,10 +354,7 @@ class _MainScreenState extends State<MainScreen> {
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const Icon(
-                            Icons.add_circle_outline,
-                            size: 18,
-                          ),
+                          const Icon(Icons.add_circle_outline, size: 18),
                           const SizedBox(width: 5),
                           Text(
                             balanceSnapshot.hasError
@@ -409,7 +392,6 @@ class _MainScreenState extends State<MainScreen> {
             onDestinationSelected: (value) {
               setState(() {
                 page = value;
-
                 if (value == 2) {
                   balanceFuture = getBalance();
                 }
@@ -423,100 +405,417 @@ class _MainScreenState extends State<MainScreen> {
   }
 }
 
-class CasinoPage extends StatelessWidget {
+// صفحة ألعاب OroPlay
+class CasinoPage extends StatefulWidget {
   const CasinoPage({super.key});
 
-  void openGame(BuildContext context, Widget gamePage) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => gamePage),
+  @override
+  State<CasinoPage> createState() => _CasinoPageState();
+}
+
+class _CasinoPageState extends State<CasinoPage> {
+  List<Map<String, dynamic>> vendors = [];
+  List<Map<String, dynamic>> games = [];
+
+  String? selectedVendor;
+  bool loadingVendors = true;
+  bool loadingGames = false;
+  String? errorMessage;
+
+  @override
+  void initState() {
+    super.initState();
+    loadVendors();
+  }
+
+  Future<dynamic> callFunction(Map<String, dynamic> body) async {
+    final result = await supabase.functions.invoke(
+      'oroplay-games',
+      body: body,
+    );
+
+    return result.data;
+  }
+
+  Future<void> loadVendors() async {
+    setState(() {
+      loadingVendors = true;
+      errorMessage = null;
+    });
+
+    try {
+      final data = await callFunction({'action': 'vendors'});
+
+      if (data is! Map || data['success'] != true) {
+        throw Exception('تعذر جلب شركات الألعاب');
+      }
+
+      final list = data['message'];
+
+      if (list is! List) {
+        throw Exception('قائمة الشركات غير صحيحة');
+      }
+
+      final loaded = list
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        vendors = loaded;
+        loadingVendors = false;
+      });
+
+      if (loaded.isNotEmpty) {
+        final firstCode = loaded.first['vendorCode']?.toString();
+        if (firstCode != null && firstCode.isNotEmpty) {
+          await selectVendor(firstCode);
+        }
+      }
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        loadingVendors = false;
+        errorMessage = 'لم نتمكن من تحميل شركات الألعاب. تحقق من الاتصال وإعدادات OroPlay.';
+      });
+    }
+  }
+
+  Future<void> selectVendor(String vendorCode) async {
+    setState(() {
+      selectedVendor = vendorCode;
+      loadingGames = true;
+      games = [];
+      errorMessage = null;
+    });
+
+    try {
+      final data = await callFunction({
+        'action': 'games',
+        'vendorCode': vendorCode,
+        'language': 'en',
+      });
+
+      if (data is! Map || data['success'] != true) {
+        throw Exception('تعذر جلب الألعاب');
+      }
+
+      final list = data['message'];
+
+      if (list is! List) {
+        throw Exception('قائمة الألعاب غير صحيحة');
+      }
+
+      final loaded = list
+          .whereType<Map>()
+          .map((item) => Map<String, dynamic>.from(item))
+          .where((game) => game['underMaintenance'] != true)
+          .toList();
+
+      if (!mounted) return;
+
+      setState(() {
+        games = loaded;
+        loadingGames = false;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() {
+        loadingGames = false;
+        errorMessage = 'تعذر تحميل ألعاب هذه الشركة.';
+      });
+    }
+  }
+
+  Future<void> launchGame(Map<String, dynamic> game) async {
+    final vendorCode = game['vendorCode']?.toString() ?? selectedVendor;
+    final gameCode = game['gameCode']?.toString() ?? '';
+
+    if (vendorCode == null || gameCode.isEmpty) {
+      showMessage('بيانات اللعبة غير مكتملة');
+      return;
+    }
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => const Center(
+        child: CircularProgressIndicator(color: gold),
+      ),
+    );
+
+    try {
+      final data = await callFunction({
+        'action': 'launch',
+        'vendorCode': vendorCode,
+        'gameCode': gameCode,
+        'language': 'en',
+      });
+
+      if (mounted) Navigator.pop(context);
+
+      if (data is! Map || data['success'] != true) {
+        throw Exception('تعذر تشغيل اللعبة');
+      }
+
+      final url = data['message']?.toString() ?? '';
+
+      final uri = Uri.tryParse(url);
+
+      if (uri == null ||
+          (uri.scheme != 'https' && uri.scheme != 'http') ||
+          uri.host.isEmpty) {
+        throw Exception('رابط تشغيل اللعبة غير صالح');
+      }
+
+      if (!mounted) return;
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => OroPlayGamePage(
+            title: game['gameName']?.toString() ?? 'OroPlay',
+            url: uri,
+          ),
+        ),
+      );
+    } catch (e) {
+      if (mounted && Navigator.canPop(context)) {
+        Navigator.pop(context);
+      }
+      showMessage('تعذر تشغيل اللعبة. تحقق من إعدادات حساب OroPlay.');
+    }
+  }
+
+  void showMessage(String text) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(text)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    return ListView(
-      padding: const EdgeInsets.all(16),
-      children: [
-        const Text(
-          'كازينو MERO',
-          style: TextStyle(
-            color: gold,
-            fontSize: 26,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          'اختر اللعبة التي تريد لعبها',
-          style: TextStyle(color: Colors.white70),
-        ),
-        const SizedBox(height: 20),
-        Card(
-          color: surface,
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: const CircleAvatar(
-              backgroundColor: Colors.deepPurple,
-              child: Icon(Icons.trending_up, color: Colors.white),
+    return RefreshIndicator(
+      onRefresh: loadVendors,
+      child: ListView(
+        padding: const EdgeInsets.all(16),
+        children: [
+          const Text(
+            'كازينو MERO',
+            style: TextStyle(
+              color: gold,
+              fontSize: 26,
+              fontWeight: FontWeight.bold,
             ),
-            title: const Text(
-              'Crash',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+          ),
+          const SizedBox(height: 6),
+          const Text(
+            'ألعاب OroPlay',
+            style: TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 20),
+
+          if (loadingVendors)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(color: gold),
               ),
             ),
-            subtitle: const Text('لعبة المضاعفات والصعود'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => openGame(context, const CrashPage()),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          color: surface,
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: const CircleAvatar(
-              backgroundColor: gold,
-              child: Icon(Icons.route, color: Colors.black),
-            ),
-            title: const Text(
-              'Chicken Road',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 18,
+
+          if (errorMessage != null)
+            Card(
+              color: surface,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  children: [
+                    Text(
+                      errorMessage!,
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    ElevatedButton(
+                      onPressed: loadVendors,
+                      child: const Text('إعادة المحاولة'),
+                    ),
+                  ],
+                ),
               ),
             ),
-            subtitle: const Text('20 خطوة • مخاطرة متوسطة'),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => openGame(context, const ChickenRoadPage()),
-          ),
-        ),
-        const SizedBox(height: 12),
-        Card(
-          color: surface,
-          child: ListTile(
-            contentPadding: const EdgeInsets.all(16),
-            leading: const CircleAvatar(
-              backgroundColor: Colors.red,
-              child: Icon(Icons.flight, color: Colors.white),
-            ),
-            title: const Text(
-              'KAMIKAZE',
+
+          if (!loadingVendors && vendors.isNotEmpty) ...[
+            const Text(
+              'شركات الألعاب',
               style: TextStyle(
-                fontWeight: FontWeight.bold,
+                color: gold,
                 fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
             ),
-            subtitle: const Text(
-              '12 صفاً • 5 مربعات • اسحب في أي وقت',
+            const SizedBox(height: 10),
+            DropdownButtonFormField<String>(
+              value: selectedVendor,
+              isExpanded: true,
+              decoration: const InputDecoration(
+                filled: true,
+                fillColor: surface,
+                border: OutlineInputBorder(),
+                labelText: 'اختر شركة الألعاب',
+              ),
+              items: vendors.map((vendor) {
+                final code = vendor['vendorCode']?.toString() ?? '';
+                final name = vendor['name']?.toString() ?? code;
+
+                return DropdownMenuItem<String>(
+                  value: code,
+                  child: Text(name),
+                );
+              }).toList(),
+              onChanged: (value) {
+                if (value != null) selectVendor(value);
+              },
             ),
-            trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => openGame(context, const KamikazePage()),
-          ),
+            const SizedBox(height: 22),
+            const Text(
+              'الألعاب المتاحة',
+              style: TextStyle(
+                color: gold,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 10),
+          ],
+
+          if (loadingGames)
+            const Center(
+              child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(color: gold),
+              ),
+            ),
+
+          if (!loadingGames && games.isEmpty && vendors.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.all(24),
+              child: Text(
+                'لا توجد ألعاب معروضة لهذه الشركة حالياً.',
+                textAlign: TextAlign.center,
+                style: TextStyle(color: Colors.white70),
+              ),
+            ),
+
+          ...games.map((game) {
+            final name = game['gameName']?.toString() ?? 'لعبة';
+            final imageUrl = game['thumbnail']?.toString() ?? '';
+
+            return Card(
+              color: surface,
+              margin: const EdgeInsets.only(bottom: 12),
+              clipBehavior: Clip.antiAlias,
+              child: ListTile(
+                contentPadding: const EdgeInsets.all(12),
+                leading: imageUrl.startsWith('http')
+                    ? Image.network(
+                        imageUrl,
+                        width: 64,
+                        height: 64,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const Icon(
+                          Icons.casino,
+                          color: gold,
+                          size: 40,
+                        ),
+                      )
+                    : const Icon(
+                        Icons.casino,
+                        color: gold,
+                        size: 40,
+                      ),
+                title: Text(
+                  name,
+                  style: const TextStyle(fontWeight: FontWeight.bold),
+                ),
+                subtitle: Text(
+                  game['provider']?.toString() ?? 'OroPlay',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+                trailing: const Icon(
+                  Icons.play_circle_fill,
+                  color: gold,
+                  size: 32,
+                ),
+                onTap: () => launchGame(game),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+// شاشة عرض اللعبة داخل التطبيق
+class OroPlayGamePage extends StatefulWidget {
+  final String title;
+  final Uri url;
+
+  const OroPlayGamePage({
+    super.key,
+    required this.title,
+    required this.url,
+  });
+
+  @override
+  State<OroPlayGamePage> createState() => _OroPlayGamePageState();
+}
+
+class _OroPlayGamePageState extends State<OroPlayGamePage> {
+  late final WebViewController controller;
+  bool loading = true;
+
+  @override
+  void initState() {
+    super.initState();
+
+    controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (_) {
+            if (mounted) setState(() => loading = true);
+          },
+          onPageFinished: (_) {
+            if (mounted) setState(() => loading = false);
+          },
         ),
-      ],
+      )
+      ..loadRequest(widget.url);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        backgroundColor: surface,
+        title: Text(
+          widget.title,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: controller),
+          if (loading)
+            const Center(
+              child: CircularProgressIndicator(color: gold),
+            ),
+        ],
+      ),
     );
   }
 }
