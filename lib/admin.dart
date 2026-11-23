@@ -506,9 +506,6 @@ class _AdminPageState extends State<AdminPage>
         params: {
           'p_request_id': id,
           'p_approve': approve,
-          'p_note': approve
-              ? 'تمت مراجعة الإيصال والموافقة'
-              : 'تم رفض الطلب بعد المراجعة',
         },
       );
 
@@ -567,17 +564,18 @@ class _AdminPageState extends State<AdminPage>
             final request = requests[index];
             final id = request['id'].toString();
 
-            final fils =
-                (request['amount_fils'] as num?)?.toDouble() ?? 0;
-            final amount = fils / 1000;
+            // المبلغ مخزن بالدينار في قاعدة البيانات
+            final amount =
+                (request['amount'] as num?)?.toDouble() ?? 0;
 
             final deposit = request['kind'] == 'deposit';
             final profile = request['profiles'];
             final playerName =
                 profile is Map ? profile['display_name'] : null;
 
+            // اسم العمود الصحيح في قاعدة البيانات
             final method =
-                (request['method'] ?? '-').toString();
+                (request['payment_method'] ?? '-').toString();
 
             final senderDetails =
                 (request['payment_reference'] ?? '').toString();
