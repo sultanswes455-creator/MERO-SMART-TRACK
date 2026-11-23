@@ -36,6 +36,12 @@ class _CrashPageState extends State<CrashPage> {
   bool finished = false;
   bool crashed = false;
 
+  // يمنع إرسال طلب تحديث جديد قبل انتهاء الطلب السابق.
+  bool pollingRequestInFlight = false;
+
+  // يمنع تكرار رسائل الخطأ كل 250 مللي ثانية.
+  bool pollingErrorShown = false;
+
   @override
   void initState() {
     super.initState();
@@ -69,7 +75,7 @@ class _CrashPageState extends State<CrashPage> {
       if (!mounted) return;
 
       setState(() {
-        // mero_balance ترجع المبلغ بالدينار مباشرة.
+        // mero_balance ترجع الرصيد بالدينار مباشرة.
         balance = number(result);
       });
     } catch (e) {
@@ -89,14 +95,20 @@ class _CrashPageState extends State<CrashPage> {
     try {
       final result = await supabase.rpc('mero_crash_active');
 
-      if (result == null || !mounted) return;
+      if (!mounted || result == null) return;
 
       final data = responseMap(result);
 
       if (data['status']?.toString() != 'active') return;
 
+      final id = data['round_id'] ?? data['id'];
+
+      if (id == null) {
+        throw Exception('معرّف الجولة غير موجود');
+      }
+
       setState(() {
-        roundId = (data['round_id'] ?? data['id']).toString();
+        roundId = id.toString();
         stake = number(data['stake']);
         multiplier = number(data['multiplier'], 1);
         payout = number(data['payout'], stake * multiplier);
@@ -125,7 +137,10 @@ class _CrashPageState extends State<CrashPage> {
       return;
     }
 
-    setState(() => loading = true);
+    setState(() {
+      loading = true;
+      statusMessage = 'جارٍ بدء الجولة...';
+    });
 
     try {
       final result = await supabase.rpc(
@@ -150,12 +165,21 @@ class _CrashPageState extends State<CrashPage> {
         running = true;
         finished = false;
         crashed = false;
+        pollingErrorShown = false;
         statusMessage = 'الجولة بدأت! اسحب أرباحك قبل الانفجار';
       });
 
       await refreshBalance();
-      startPolling();
+
+      if (mounted && running) {
+        startPolling();
+      }
     } catch (e) {
+      if (mounted) {
+        setState(() {
+          statusMessage = 'تعذر بدء الجولة';
+        });
+      }
       showMessage('تعذر بدء اللعبة: $e');
     } finally {
       if (mounted) {
@@ -166,15 +190,27 @@ class _CrashPageState extends State<CrashPage> {
 
   void startPolling() {
     timer?.cancel();
+    pollingRequestInFlight = false;
+    pollingErrorShown = false;
 
     timer = Timer.periodic(
       const Duration(milliseconds: 250),
-      (_) => updateGame(),
+      (_) {
+        updateGame();
+      },
     );
   }
 
   Future<void> updateGame() async {
-    if (!running || roundId == null || loading) return;
+    if (!mounted ||
+        !running ||
+        roundId == null ||
+        loading ||
+        pollingRequestInFlight) {
+      return;
+    }
+
+    pollingRequestInFlight = true;
 
     try {
       final result = await supabase.rpc(
@@ -186,6 +222,8 @@ class _CrashPageState extends State<CrashPage> {
       final newStatus = data['status']?.toString();
 
       if (!mounted) return;
+
+      pollingErrorShown = false;
 
       setState(() {
         multiplier = number(data['multiplier'], multiplier);
@@ -202,6 +240,7 @@ class _CrashPageState extends State<CrashPage> {
             newStatus == 'completed') {
           running = false;
           finished = true;
+          crashed = false;
           statusMessage = 'انتهت الجولة';
           timer?.cancel();
         }
@@ -211,7 +250,13 @@ class _CrashPageState extends State<CrashPage> {
         await refreshBalance();
       }
     } catch (e) {
-      // Keep the current display if a temporary request fails.
+      // نظهر الخطأ مرة واحدة بدلاً من إزعاج المستخدم كل 250ms.
+      if (mounted && !pollingErrorShown) {
+        pollingErrorShown = true;
+        showMessage('تعذر تحديث الجولة. تحقق من الاتصال بالإنترنت.');
+      }
+    } finally {
+      pollingRequestInFlight = false;
     }
   }
 
@@ -219,15 +264,27 @@ class _CrashPageState extends State<CrashPage> {
     if (loading || !running || roundId == null) return;
 
     timer?.cancel();
-    setState(() => loading = true);
+
+    setState(() {
+      loading = true;
+      statusMessage = 'جارٍ تنفيذ السحب...';
+    });
 
     try {
+      // ننتظر انتهاء طلب التحديث الجاري قبل طلب السحب.
+      while (pollingRequestInFlight) {
+        await Future.delayed(const Duration(milliseconds: 20));
+
+        if (!mounted) return;
+      }
+
       final result = await supabase.rpc(
         'mero_crash_cashout',
         params: {'p_round_id': roundId},
       );
 
       final data = responseMap(result);
+      final resultStatus = data['status']?.toString();
 
       if (!mounted) return;
 
@@ -236,7 +293,7 @@ class _CrashPageState extends State<CrashPage> {
         payout = number(data['payout'], payout);
         running = false;
         finished = true;
-        crashed = data['status']?.toString() == 'crashed';
+        crashed = resultStatus == 'crashed';
 
         statusMessage = crashed
             ? 'انفجرت الجولة! لم يتم سحب الأرباح'
@@ -247,7 +304,7 @@ class _CrashPageState extends State<CrashPage> {
     } catch (e) {
       showMessage('تعذر سحب الأرباح: $e');
 
-      if (running) {
+      if (mounted && running) {
         startPolling();
       }
     } finally {
@@ -268,6 +325,8 @@ class _CrashPageState extends State<CrashPage> {
       running = false;
       finished = false;
       crashed = false;
+      loading = false;
+      pollingErrorShown = false;
       statusMessage = 'ضع رهانك وابدأ اللعب';
     });
   }
