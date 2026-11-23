@@ -32,7 +32,6 @@ jobs:
 
       - name: Set Android Compile SDK
         run: |
-          sed -i 's/flutter.compileSdkVersion/36/g' android/app/build.gradle
           sed -i 's/flutter.compileSdkVersion/36/g' android/app/build.gradle.kts
 
       - name: Get dependencies
