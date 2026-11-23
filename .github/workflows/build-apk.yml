@@ -37,6 +37,44 @@ jobs:
       - name: Get dependencies
         run: flutter pub get
 
+      - name: Fix Compile SDK in all plugins
+        run: |
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+
+          root = Path.home() / ".pub-cache" / "hosted"
+          count = 0
+
+          for file in root.rglob("*"):
+              if file.name not in ("build.gradle", "build.gradle.kts"):
+                  continue
+
+              try:
+                  content = file.read_text()
+                  updated = content.replace("flutter.compileSdkVersion", "36")
+
+                  updated = re.sub(
+                      r'(?m)^(\s*compileSdkVersion\s+)(\d+)',
+                      lambda m: m.group(1) + ("36" if int(m.group(2)) < 36 else m.group(2)),
+                      updated
+                  )
+
+                  updated = re.sub(
+                      r'(?m)^(\s*compileSdk\s*=\s*)(\d+)',
+                      lambda m: m.group(1) + ("36" if int(m.group(2)) < 36 else m.group(2)),
+                      updated
+                  )
+
+                  if updated != content:
+                      file.write_text(updated)
+                      count += 1
+              except (OSError, UnicodeDecodeError):
+                  pass
+
+          print(f"Updated Android plugin Gradle files: {count}")
+          PY
+
       - name: Build APK
         run: flutter build apk --release
 
