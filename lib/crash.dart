@@ -65,10 +65,12 @@ class _CrashPageState extends State<CrashPage> {
   Future<void> refreshBalance() async {
     try {
       final result = await supabase.rpc('mero_balance');
+
       if (!mounted) return;
 
       setState(() {
-        balance = number(result) / 1000;
+        // mero_balance ترجع المبلغ بالدينار مباشرة.
+        balance = number(result);
       });
     } catch (e) {
       showMessage('تعذر تحديث رصيد المحفظة: $e');
@@ -77,6 +79,7 @@ class _CrashPageState extends State<CrashPage> {
 
   void showMessage(String message) {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(message)),
     );
@@ -85,6 +88,7 @@ class _CrashPageState extends State<CrashPage> {
   Future<void> loadActiveRound() async {
     try {
       final result = await supabase.rpc('mero_crash_active');
+
       if (result == null || !mounted) return;
 
       final data = responseMap(result);
@@ -154,7 +158,9 @@ class _CrashPageState extends State<CrashPage> {
     } catch (e) {
       showMessage('تعذر بدء اللعبة: $e');
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
   }
 
@@ -201,7 +207,9 @@ class _CrashPageState extends State<CrashPage> {
         }
       });
 
-      if (finished) await refreshBalance();
+      if (finished) {
+        await refreshBalance();
+      }
     } catch (e) {
       // Keep the current display if a temporary request fails.
     }
@@ -228,17 +236,24 @@ class _CrashPageState extends State<CrashPage> {
         payout = number(data['payout'], payout);
         running = false;
         finished = true;
-        crashed = false;
-        statusMessage =
-            'تم السحب بنجاح: ${payout.toStringAsFixed(3)} JOD';
+        crashed = data['status']?.toString() == 'crashed';
+
+        statusMessage = crashed
+            ? 'انفجرت الجولة! لم يتم سحب الأرباح'
+            : 'تم السحب بنجاح: ${payout.toStringAsFixed(3)} JOD';
       });
 
       await refreshBalance();
     } catch (e) {
       showMessage('تعذر سحب الأرباح: $e');
-      if (running) startPolling();
+
+      if (running) {
+        startPolling();
+      }
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
   }
 
@@ -268,8 +283,10 @@ class _CrashPageState extends State<CrashPage> {
         ),
         child: Column(
           children: [
-            Text(title,
-                style: const TextStyle(color: Colors.white60)),
+            Text(
+              title,
+              style: const TextStyle(color: Colors.white60),
+            ),
             const SizedBox(height: 6),
             FittedBox(
               child: Text(
@@ -462,7 +479,10 @@ class _CrashPageState extends State<CrashPage> {
                     const SizedBox(height: 8),
                     const Text(
                       'الحد الأدنى 0.100 د.أ - الحد الأقصى 435.000 د.أ',
-                      style: TextStyle(color: Colors.white60, fontSize: 11),
+                      style: TextStyle(
+                        color: Colors.white60,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
