@@ -9,7 +9,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -25,15 +24,24 @@ jobs:
       - name: Set app compile SDK
         run: |
           sed -i 's/compileSdk = flutter.compileSdkVersion/compileSdk = 36/' android/app/build.gradle.kts
-          grep "compileSdk" android/app/build.gradle.kts
 
       - name: Install dependencies
         run: flutter pub get
 
-      - name: Set plugin compile SDK to 36
+      - name: Force Android plugins to compile with API 36
+        shell: bash
         run: |
-          find "$HOME/.pub-cache/hosted/pub.dev" -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -path "*/android/*" -exec sed -i 's/flutter.compileSdkVersion/36/g' {} +
-          grep -R "compileSdk" "$HOME/.pub-cache/hosted/pub.dev/file_picker-"*/android/
+          set -e
+          CACHE="$HOME/.pub-cache/hosted/pub.dev"
+          find "$CACHE" -type f \( -name "build.gradle" -o -name "build.gradle.kts" \) -path "*/android/*" -print0 |
+          while IFS= read -r -d '' file; do
+            sed -i -E \
+              -e 's/(compileSdkVersion[[:space:]]+)[0-9]+/\136/g' \
+              -e 's/(compileSdkVersion[[:space:]]+|compileSdk[[:space:]]*=[[:space:]]*)flutter.compileSdkVersion/\136/g' \
+              -e 's/(compileSdk[[:space:]]*=[[:space:]]*)[0-9]+/\136/g' \
+              "$file"
+          done
+          grep -R -n -E 'compileSdk|compileSdkVersion' "$CACHE"/file_picker-*/android/ || true
 
       - name: Build APK
         run: flutter build apk --release
