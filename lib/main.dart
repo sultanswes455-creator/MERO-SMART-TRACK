@@ -215,6 +215,7 @@ class MainScreen extends StatefulWidget {
 
 class _MainScreenState extends State<MainScreen> {
   int page = 0;
+
   late Future<bool> ownerFuture;
   late Future<double> balanceFuture;
 
@@ -242,13 +243,18 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+  // mero_balance returns fils.
+  // Convert fils to JOD before displaying.
   Future<double> getBalance() async {
     final result = await supabase.rpc('mero_balance');
 
     if (result == null) return 0;
-    if (result is num) return result.toDouble();
 
-    return double.tryParse(result.toString()) ?? 0;
+    final fils = result is num
+        ? result.toDouble()
+        : double.tryParse(result.toString()) ?? 0;
+
+    return fils / 1000;
   }
 
   void openDeposit() {
@@ -374,6 +380,7 @@ class _MainScreenState extends State<MainScreen> {
             onDestinationSelected: (value) {
               setState(() {
                 page = value;
+
                 if (value == 2) {
                   balanceFuture = getBalance();
                 }
@@ -390,10 +397,10 @@ class _MainScreenState extends State<MainScreen> {
 class CasinoPage extends StatelessWidget {
   const CasinoPage({super.key});
 
-  void openGame(BuildContext context, Widget page) {
+  void openGame(BuildContext context, Widget gamePage) {
     Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => page),
+      MaterialPageRoute(builder: (_) => gamePage),
     );
   }
 
