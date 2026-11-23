@@ -1,6 +1,9 @@
 
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 const walletOwnerName = 'عبدالله صويص';
@@ -23,17 +26,28 @@ class _WalletPageState extends State<WalletPage> {
 
   String method = 'Orange Money';
   String kind = 'deposit';
+
   bool loading = false;
+  bool pickingFile = false;
+
+  Uint8List? proofBytes;
+  String? proofName;
+  String? proofExtension;
+  String? proofMimeType;
 
   Future<double> getBalance() async {
     final result = await walletDb.rpc('mero_balance');
+
     if (result == null) return 0;
+
     if (result is num) return result.toDouble();
+
     return double.tryParse(result.toString()) ?? 0;
   }
 
   void notify(String text) {
     if (!mounted) return;
+
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text)),
     );
@@ -43,17 +57,145 @@ class _WalletPageState extends State<WalletPage> {
     await Clipboard.setData(
       const ClipboardData(text: walletOwnerNumber),
     );
+
     notify('تم نسخ رقم المحفظة');
   }
 
+  Future<void> chooseProof() async {
+    if (pickingFile || loading) return;
+
+    setState(() => pickingFile = true);
+
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        type: FileType.custom,
+        allowedExtensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'pdf',
+        ],
+        withData: true,
+      );
+
+      if (result == null || result.files.isEmpty) return;
+
+      final file = result.files.single;
+
+      if (file.size > 10 * 1024 * 1024) {
+        notify('حجم الإيصال يجب ألا يتجاوز 10 ميغابايت');
+        return;
+      }
+
+      if (file.bytes == null || file.bytes!.isEmpty) {
+        notify('تعذر قراءة الملف، حاول اختيار الملف مرة أخرى');
+        return;
+      }
+
+      final extension = file.extension?.toLowerCase() ?? '';
+
+      const allowed = [
+        'jpg',
+        'jpeg',
+        'png',
+        'webp',
+        'pdf',
+      ];
+
+      if (!allowed.contains(extension)) {
+        notify('نوع الملف غير مدعوم');
+        return;
+      }
+
+      String mime;
+
+      switch (extension) {
+        case 'jpg':
+        case 'jpeg':
+          mime = 'image/jpeg';
+          break;
+        case 'png':
+          mime = 'image/png';
+          break;
+        case 'webp':
+          mime = 'image/webp';
+          break;
+        case 'pdf':
+          mime = 'application/pdf';
+          break;
+        default:
+          mime = 'application/octet-stream';
+      }
+
+      if (!mounted) return;
+
+      setState(() {
+        proofBytes = file.bytes;
+        proofName = file.name;
+        proofExtension = extension;
+        proofMimeType = mime;
+      });
+
+      notify('تم اختيار الإيصال بنجاح');
+    } catch (e) {
+      notify('تعذر اختيار الملف: $e');
+    } finally {
+      if (mounted) {
+        setState(() => pickingFile = false);
+      }
+    }
+  }
+
+  void removeProof() {
+    setState(() {
+      proofBytes = null;
+      proofName = null;
+      proofExtension = null;
+      proofMimeType = null;
+    });
+  }
+
+  Future<String> uploadProof() async {
+    final user = walletDb.auth.currentUser;
+
+    if (user == null) {
+      throw Exception('يجب تسجيل الدخول أولاً');
+    }
+
+    if (proofBytes == null ||
+        proofExtension == null ||
+        proofMimeType == null) {
+      throw Exception('يرجى إرفاق إيصال التحويل');
+    }
+
+    final filePath =
+        '${user.id}/${DateTime.now().microsecondsSinceEpoch}.$proofExtension';
+
+    await walletDb.storage
+        .from('wallet-proofs')
+        .uploadBinary(
+          filePath,
+          proofBytes!,
+          fileOptions: FileOptions(
+            contentType: proofMimeType!,
+            upsert: false,
+          ),
+        );
+
+    return filePath;
+  }
+
   Future<void> submit() async {
-    final value = double.tryParse(amount.text.trim());
+    final rawAmount = amount.text.trim();
+    final value = double.tryParse(rawAmount);
 
     if (value == null ||
+        !value.isFinite ||
         value < 1 ||
         value > 200 ||
-        (value * 100).round() != value * 100) {
-      notify('أدخل مبلغاً من 1 إلى 200 دينار وبحد أقصى منزلتين عشريتين');
+        !RegExp(r'^\d+(\.\d{1,3})?$').hasMatch(rawAmount)) {
+      notify('أدخل مبلغاً من 1 إلى 200 دينار وبحد أقصى 3 منازل عشرية');
       return;
     }
 
@@ -62,19 +204,33 @@ class _WalletPageState extends State<WalletPage> {
         notify('أدخل اسم صاحب الحوالة');
         return;
       }
+
       if (senderPhone.text.trim().isEmpty) {
         notify('أدخل رقم الهاتف الذي أُرسلت منه الحوالة');
         return;
       }
-    } else if (destination.text.trim().isEmpty) {
-      notify('أدخل رقم محفظتك لاستلام السحب');
-      return;
+
+      if (proofBytes == null) {
+        notify('يجب إرفاق صورة أو PDF لإيصال التحويل');
+        return;
+      }
+    } else {
+      if (destination.text.trim().isEmpty) {
+        notify('أدخل رقم محفظتك لاستلام السحب');
+        return;
+      }
     }
 
     setState(() => loading = true);
 
+    String? uploadedPath;
+
     try {
       final fils = (value * 1000).round();
+
+      if (kind == 'deposit') {
+        uploadedPath = await uploadProof();
+      }
 
       final senderDetails = kind == 'deposit'
           ? 'اسم المرسل: ${senderName.text.trim()} | رقم المرسل: ${senderPhone.text.trim()}'
@@ -90,7 +246,7 @@ class _WalletPageState extends State<WalletPage> {
           'p_destination': kind == 'withdrawal'
               ? destination.text.trim()
               : '',
-          'p_proof_path': null,
+          'p_proof_path': uploadedPath,
         },
       );
 
@@ -99,16 +255,37 @@ class _WalletPageState extends State<WalletPage> {
       senderPhone.clear();
       destination.clear();
 
-      if (mounted) {
-        notify('تم إرسال الطلب بنجاح. بانتظار مراجعة الإدارة.');
-        setState(() {});
-      }
+      removeProof();
+
+      notify(
+        kind == 'deposit'
+            ? 'تم إرسال طلب الإيداع والإيصال بنجاح. بانتظار مراجعة الإدارة.'
+            : 'تم إرسال طلب السحب بنجاح. بانتظار مراجعة الإدارة.',
+      );
     } on PostgrestException catch (e) {
+      if (uploadedPath != null) {
+        try {
+          await walletDb.storage
+              .from('wallet-proofs')
+              .remove([uploadedPath]);
+        } catch (_) {}
+      }
+
       notify('تعذر إرسال الطلب: ${e.message}');
     } catch (e) {
+      if (uploadedPath != null) {
+        try {
+          await walletDb.storage
+              .from('wallet-proofs')
+              .remove([uploadedPath]);
+        } catch (_) {}
+      }
+
       notify('حدث خطأ: $e');
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
   }
 
@@ -121,7 +298,10 @@ class _WalletPageState extends State<WalletPage> {
     super.dispose();
   }
 
-  InputDecoration fieldDecoration(String label, {String? hint}) {
+  InputDecoration fieldDecoration(
+    String label, {
+    String? hint,
+  }) {
     return InputDecoration(
       labelText: label,
       hintText: hint,
@@ -150,10 +330,13 @@ class _WalletPageState extends State<WalletPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('الحد الأدنى'),
-                Text('1 JOD', style: TextStyle(
-                  color: Color(0xFFFFC928),
-                  fontWeight: FontWeight.bold,
-                )),
+                Text(
+                  '1 JOD',
+                  style: TextStyle(
+                    color: Color(0xFFFFC928),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
             const SizedBox(height: 8),
@@ -161,10 +344,13 @@ class _WalletPageState extends State<WalletPage> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('الحد الأقصى'),
-                Text('200 JOD', style: TextStyle(
-                  color: Color(0xFFFFC928),
-                  fontWeight: FontWeight.bold,
-                )),
+                Text(
+                  '200 JOD',
+                  style: TextStyle(
+                    color: Color(0xFFFFC928),
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ],
             ),
           ],
@@ -183,14 +369,20 @@ class _WalletPageState extends State<WalletPage> {
           children: [
             const Text(
               'بيانات محفظة الإيداع',
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 17,
+              ),
             ),
             const SizedBox(height: 14),
             const Text('اسم صاحب المحفظة'),
             const SizedBox(height: 5),
             const Text(
               walletOwnerName,
-              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 14),
             const Text('رقم المحفظة'),
@@ -219,8 +411,121 @@ class _WalletPageState extends State<WalletPage> {
             ),
             const Divider(),
             const Text(
-              'حوّل المبلغ إلى المحفظة أعلاه، ثم أدخل بيانات الشخص الذي أرسل الحوالة.',
+              'حوّل المبلغ إلى المحفظة أعلاه، ثم أدخل بيانات المرسل وأرفق إيصال التحويل.',
               style: TextStyle(color: Colors.white70),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget proofPicker() {
+    return Card(
+      color: const Color(0xFF1B202B),
+      child: Padding(
+        padding: const EdgeInsets.all(14),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'إيصال التحويل',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 10),
+            if (proofBytes == null)
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: pickingFile || loading
+                      ? null
+                      : chooseProof,
+                  icon: const Icon(Icons.upload_file),
+                  label: Text(
+                    pickingFile
+                        ? 'جارٍ اختيار الملف...'
+                        : 'اختر صورة أو PDF للإيصال',
+                  ),
+                ),
+              )
+            else
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  border: Border.all(
+                    color: const Color(0xFFFFC928),
+                  ),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Column(
+                  children: [
+                    if (proofExtension != 'pdf')
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.memory(
+                          proofBytes!,
+                          height: 170,
+                          width: double.infinity,
+                          fit: BoxFit.contain,
+                          errorBuilder: (_, __, ___) {
+                            return const Icon(
+                              Icons.image,
+                              size: 65,
+                            );
+                          },
+                        ),
+                      )
+                    else
+                      const Padding(
+                        padding: EdgeInsets.all(15),
+                        child: Icon(
+                          Icons.picture_as_pdf,
+                          size: 60,
+                          color: Colors.redAccent,
+                        ),
+                      ),
+                    const SizedBox(height: 8),
+                    Text(
+                      proofName ?? 'الإيصال',
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: loading
+                                ? null
+                                : chooseProof,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('تغيير'),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: loading
+                                ? null
+                                : removeProof,
+                            icon: const Icon(Icons.delete_outline),
+                            label: const Text('حذف'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            const SizedBox(height: 8),
+            const Text(
+              'الصيغ المدعومة: JPG و PNG و WEBP و PDF. الحد الأقصى 10 ميغابايت.',
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 12,
+              ),
             ),
           ],
         ),
@@ -237,6 +542,7 @@ class _WalletPageState extends State<WalletPage> {
           future: getBalance(),
           builder: (context, snapshot) {
             final jod = snapshot.data ?? 0.0;
+
             return Card(
               color: const Color(0xFF1B202B),
               child: Padding(
@@ -280,7 +586,10 @@ class _WalletPageState extends State<WalletPage> {
           ],
           selected: {kind},
           onSelectionChanged: (value) {
-            setState(() => kind = value.first);
+            setState(() {
+              kind = value.first;
+              removeProof();
+            });
           },
         ),
         const SizedBox(height: 18),
@@ -300,7 +609,9 @@ class _WalletPageState extends State<WalletPage> {
             ),
           ],
           onChanged: (value) {
-            if (value != null) setState(() => method = value);
+            if (value != null) {
+              setState(() => method = value);
+            }
           },
         ),
         const SizedBox(height: 16),
@@ -321,19 +632,8 @@ class _WalletPageState extends State<WalletPage> {
               'رقم الهاتف الذي أُرسلت منه الحوالة',
             ),
           ),
-          const SizedBox(height: 12),
-          const Text(
-            'تم حذف خانة الرقم المرجعي للحوالة.',
-            style: TextStyle(color: Colors.white70),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            'رفع صورة الإيصال يحتاج إعداد Storage في Supabase.',
-            style: TextStyle(
-              color: Colors.orangeAccent,
-              fontSize: 12,
-            ),
-          ),
+          const SizedBox(height: 14),
+          proofPicker(),
         ] else ...[
           TextField(
             controller: destination,
@@ -364,7 +664,7 @@ class _WalletPageState extends State<WalletPage> {
         SizedBox(
           height: 52,
           child: ElevatedButton(
-            onPressed: loading ? null : submit,
+            onPressed: loading || pickingFile ? null : submit,
             child: Text(
               loading
                   ? 'يرجى الانتظار...'
