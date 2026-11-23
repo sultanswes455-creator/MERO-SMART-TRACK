@@ -1,4 +1,6 @@
 
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -219,11 +221,32 @@ class _MainScreenState extends State<MainScreen> {
   late Future<bool> ownerFuture;
   late Future<double> balanceFuture;
 
+  Timer? balanceRefreshTimer;
+
   @override
   void initState() {
     super.initState();
+
     ownerFuture = checkOwner();
     balanceFuture = getBalance();
+
+    // تحديث الرصيد العلوي تلقائياً كل 5 ثوانٍ.
+    balanceRefreshTimer = Timer.periodic(
+      const Duration(seconds: 5),
+      (_) {
+        if (!mounted) return;
+
+        setState(() {
+          balanceFuture = getBalance();
+        });
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    balanceRefreshTimer?.cancel();
+    super.dispose();
   }
 
   Future<bool> checkOwner() async {
@@ -244,7 +267,7 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   // mero_balance returns fils.
-  // Convert fils to JOD before displaying.
+  // 1000 fils = 1 JOD.
   Future<double> getBalance() async {
     final result = await supabase.rpc('mero_balance');
 
@@ -255,6 +278,14 @@ class _MainScreenState extends State<MainScreen> {
         : double.tryParse(result.toString()) ?? 0;
 
     return fils / 1000;
+  }
+
+  void refreshHeaderBalance() {
+    if (!mounted) return;
+
+    setState(() {
+      balanceFuture = getBalance();
+    });
   }
 
   void openDeposit() {
@@ -347,7 +378,9 @@ class _MainScreenState extends State<MainScreen> {
                           ),
                           const SizedBox(width: 5),
                           Text(
-                            'د.أ ${jod.toStringAsFixed(3)}',
+                            balanceSnapshot.hasError
+                                ? 'تعذر تحميل الرصيد'
+                                : 'د.أ ${jod.toStringAsFixed(3)}',
                             style: const TextStyle(
                               fontWeight: FontWeight.bold,
                               fontSize: 13,
