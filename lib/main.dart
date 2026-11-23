@@ -230,7 +230,6 @@ class _MainScreenState extends State<MainScreen> {
     ownerFuture = checkOwner();
     balanceFuture = getBalance();
 
-    // تحديث الرصيد العلوي تلقائياً كل 5 ثوانٍ.
     balanceRefreshTimer = Timer.periodic(
       const Duration(seconds: 5),
       (_) {
@@ -266,18 +265,15 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
-  // mero_balance returns fils.
-  // 1000 fils = 1 JOD.
+  // mero_balance returns JOD directly.
   Future<double> getBalance() async {
     final result = await supabase.rpc('mero_balance');
 
     if (result == null) return 0;
 
-    final fils = result is num
-        ? result.toDouble()
-        : double.tryParse(result.toString()) ?? 0;
+    if (result is num) return result.toDouble();
 
-    return fils / 1000;
+    return double.tryParse(result.toString()) ?? 0;
   }
 
   void refreshHeaderBalance() {
@@ -456,8 +452,6 @@ class CasinoPage extends StatelessWidget {
           style: TextStyle(color: Colors.white70),
         ),
         const SizedBox(height: 20),
-
-        // Crash
         Card(
           color: surface,
           child: ListTile(
@@ -475,16 +469,10 @@ class CasinoPage extends StatelessWidget {
             ),
             subtitle: const Text('لعبة المضاعفات والصعود'),
             trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => openGame(
-              context,
-              const CrashPage(),
-            ),
+            onTap: () => openGame(context, const CrashPage()),
           ),
         ),
-
         const SizedBox(height: 12),
-
-        // Chicken Road
         Card(
           color: surface,
           child: ListTile(
@@ -502,16 +490,10 @@ class CasinoPage extends StatelessWidget {
             ),
             subtitle: const Text('20 خطوة • مخاطرة متوسطة'),
             trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => openGame(
-              context,
-              const ChickenRoadPage(),
-            ),
+            onTap: () => openGame(context, const ChickenRoadPage()),
           ),
         ),
-
         const SizedBox(height: 12),
-
-        // Kamikaze
         Card(
           color: surface,
           child: ListTile(
@@ -531,10 +513,7 @@ class CasinoPage extends StatelessWidget {
               '12 صفاً • 5 مربعات • اسحب في أي وقت',
             ),
             trailing: const Icon(Icons.arrow_forward_ios),
-            onTap: () => openGame(
-              context,
-              const KamikazePage(),
-            ),
+            onTap: () => openGame(context, const KamikazePage()),
           ),
         ),
       ],
