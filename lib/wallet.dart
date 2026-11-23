@@ -17,8 +17,9 @@ class WalletPage extends StatefulWidget {
 
 class _WalletPageState extends State<WalletPage> {
   final amount = TextEditingController();
-  final reference = TextEditingController();
   final destination = TextEditingController();
+  final senderName = TextEditingController();
+  final senderPhone = TextEditingController();
 
   String method = 'Orange Money';
   String kind = 'deposit';
@@ -32,6 +33,7 @@ class _WalletPageState extends State<WalletPage> {
   }
 
   void notify(String text) {
+    if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(text)),
     );
@@ -47,38 +49,25 @@ class _WalletPageState extends State<WalletPage> {
   Future<void> submit() async {
     final value = double.tryParse(amount.text.trim());
 
-    if (value == null || value <= 0) {
-      notify('أدخل مبلغاً صحيحاً');
+    if (value == null ||
+        value < 1 ||
+        value > 200 ||
+        (value * 100).round() != value * 100) {
+      notify('أدخل مبلغاً من 1 إلى 200 دينار وبحد أقصى منزلتين عشريتين');
       return;
     }
 
-    if (value < 1) {
-      notify(
-        kind == 'deposit'
-            ? 'الحد الأدنى للإيداع هو 1 JOD'
-            : 'الحد الأدنى للسحب هو 1 JOD',
-      );
-      return;
-    }
-
-    if (value > 200) {
-      notify(
-        kind == 'deposit'
-            ? 'الحد الأقصى للإيداع هو 200 JOD'
-            : 'الحد الأقصى للسحب هو 200 JOD',
-      );
-      return;
-    }
-
-    if (kind == 'withdrawal' &&
-        destination.text.trim().isEmpty) {
+    if (kind == 'deposit') {
+      if (senderName.text.trim().isEmpty) {
+        notify('أدخل اسم صاحب الحوالة');
+        return;
+      }
+      if (senderPhone.text.trim().isEmpty) {
+        notify('أدخل رقم الهاتف الذي أُرسلت منه الحوالة');
+        return;
+      }
+    } else if (destination.text.trim().isEmpty) {
       notify('أدخل رقم محفظتك لاستلام السحب');
-      return;
-    }
-
-    if (kind == 'deposit' &&
-        reference.text.trim().isEmpty) {
-      notify('أدخل رقم مرجع الحوالة');
       return;
     }
 
@@ -87,26 +76,27 @@ class _WalletPageState extends State<WalletPage> {
     try {
       final fils = (value * 1000).round();
 
+      final senderDetails = kind == 'deposit'
+          ? 'اسم المرسل: ${senderName.text.trim()} | رقم المرسل: ${senderPhone.text.trim()}'
+          : '';
+
       await walletDb.rpc(
         'mero_create_wallet_request',
         params: {
           'p_kind': kind,
           'p_amount_fils': fils,
           'p_method': method,
-          'p_payment_reference':
-              kind == 'deposit'
-                  ? reference.text.trim()
-                  : '',
-          'p_destination':
-              kind == 'withdrawal'
-                  ? destination.text.trim()
-                  : '',
+          'p_payment_reference': senderDetails,
+          'p_destination': kind == 'withdrawal'
+              ? destination.text.trim()
+              : '',
           'p_proof_path': null,
         },
       );
 
       amount.clear();
-      reference.clear();
+      senderName.clear();
+      senderPhone.clear();
       destination.clear();
 
       if (mounted) {
@@ -118,70 +108,122 @@ class _WalletPageState extends State<WalletPage> {
     } catch (e) {
       notify('حدث خطأ: $e');
     } finally {
-      if (mounted) {
-        setState(() => loading = false);
-      }
+      if (mounted) setState(() => loading = false);
     }
   }
 
   @override
   void dispose() {
     amount.dispose();
-    reference.dispose();
     destination.dispose();
+    senderName.dispose();
+    senderPhone.dispose();
     super.dispose();
   }
 
+  InputDecoration fieldDecoration(String label, {String? hint}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      border: const OutlineInputBorder(),
+    );
+  }
+
   Widget limitsCard() {
-    return Container(
-      padding: const EdgeInsets.all(15),
-      decoration: BoxDecoration(
-        color: const Color(0xFF1B202B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: const Color(0xFFFFC928).withOpacity(0.5),
+    return Card(
+      color: const Color(0xFF1B202B),
+      child: Padding(
+        padding: const EdgeInsets.all(15),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              kind == 'deposit' ? 'حدود الإيداع' : 'حدود السحب',
+              style: const TextStyle(
+                color: Color(0xFFFFC928),
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('الحد الأدنى'),
+                Text('1 JOD', style: TextStyle(
+                  color: Color(0xFFFFC928),
+                  fontWeight: FontWeight.bold,
+                )),
+              ],
+            ),
+            const SizedBox(height: 8),
+            const Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text('الحد الأقصى'),
+                Text('200 JOD', style: TextStyle(
+                  color: Color(0xFFFFC928),
+                  fontWeight: FontWeight.bold,
+                )),
+              ],
+            ),
+          ],
         ),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text(
-            kind == 'deposit' ? 'حدود الإيداع' : 'حدود السحب',
-            style: const TextStyle(
-              color: Color(0xFFFFC928),
-              fontWeight: FontWeight.bold,
-              fontSize: 16,
+    );
+  }
+
+  Widget depositWalletDetails() {
+    return Card(
+      color: const Color(0xFF1B202B),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              'بيانات محفظة الإيداع',
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 17),
             ),
-          ),
-          const SizedBox(height: 10),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('الحد الأدنى'),
-              Text(
-                '1 JOD',
-                style: TextStyle(
-                  color: Color(0xFFFFC928),
-                  fontWeight: FontWeight.bold,
+            const SizedBox(height: 14),
+            const Text('اسم صاحب المحفظة'),
+            const SizedBox(height: 5),
+            const Text(
+              walletOwnerName,
+              style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 14),
+            const Text('رقم المحفظة'),
+            const SizedBox(height: 5),
+            Row(
+              children: [
+                const Expanded(
+                  child: SelectableText(
+                    walletOwnerNumber,
+                    style: TextStyle(
+                      color: Color(0xFFFFC928),
+                      fontSize: 21,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('الحد الأقصى'),
-              Text(
-                '200 JOD',
-                style: TextStyle(
-                  color: Color(0xFFFFC928),
-                  fontWeight: FontWeight.bold,
+                IconButton(
+                  onPressed: copyNumber,
+                  tooltip: 'نسخ الرقم',
+                  icon: const Icon(
+                    Icons.copy,
+                    color: Color(0xFFFFC928),
+                  ),
                 ),
-              ),
-            ],
-          ),
-        ],
+              ],
+            ),
+            const Divider(),
+            const Text(
+              'حوّل المبلغ إلى المحفظة أعلاه، ثم أدخل بيانات الشخص الذي أرسل الحوالة.',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -195,7 +237,6 @@ class _WalletPageState extends State<WalletPage> {
           future: getBalance(),
           builder: (context, snapshot) {
             final jod = snapshot.data ?? 0.0;
-
             return Card(
               color: const Color(0xFF1B202B),
               child: Padding(
@@ -224,7 +265,6 @@ class _WalletPageState extends State<WalletPage> {
           },
         ),
         const SizedBox(height: 18),
-
         SegmentedButton<String>(
           segments: const [
             ButtonSegment(
@@ -240,24 +280,15 @@ class _WalletPageState extends State<WalletPage> {
           ],
           selected: {kind},
           onSelectionChanged: (value) {
-            setState(() {
-              kind = value.first;
-            });
+            setState(() => kind = value.first);
           },
         ),
-
         const SizedBox(height: 18),
-
         limitsCard(),
-
         const SizedBox(height: 18),
-
         DropdownButtonFormField<String>(
           value: method,
-          decoration: const InputDecoration(
-            labelText: 'طريقة التحويل',
-            border: OutlineInputBorder(),
-          ),
+          decoration: fieldDecoration('طريقة التحويل'),
           items: const [
             DropdownMenuItem(
               value: 'Orange Money',
@@ -269,97 +300,67 @@ class _WalletPageState extends State<WalletPage> {
             ),
           ],
           onChanged: (value) {
-            if (value != null) {
-              setState(() => method = value);
-            }
+            if (value != null) setState(() => method = value);
           },
         ),
-
         const SizedBox(height: 16),
-
         if (kind == 'deposit') ...[
-          Card(
-            color: const Color(0xFF1B202B),
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'بيانات التحويل للإيداع',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  Text('اسم صاحب المحفظة: $walletOwnerName'),
-                  const SizedBox(height: 8),
-                  const SelectableText(
-                    walletOwnerNumber,
-                    style: TextStyle(
-                      color: Color(0xFFFFC928),
-                      fontSize: 21,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextButton.icon(
-                      onPressed: copyNumber,
-                      icon: const Icon(Icons.copy),
-                      label: const Text('نسخ الرقم'),
-                    ),
-                  ),
-                  const Text(
-                    'حوّل المبلغ أولاً ثم أدخل رقم مرجع الحوالة.',
-                    style: TextStyle(color: Colors.white70),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          depositWalletDetails(),
           const SizedBox(height: 14),
           TextField(
-            controller: reference,
-            decoration: const InputDecoration(
-              labelText: 'رقم مرجع الحوالة',
-              border: OutlineInputBorder(),
+            controller: senderName,
+            decoration: fieldDecoration(
+              'اسم الشخص الذي أرسل الحوالة',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: senderPhone,
+            keyboardType: TextInputType.phone,
+            decoration: fieldDecoration(
+              'رقم الهاتف الذي أُرسلت منه الحوالة',
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            'تم حذف خانة الرقم المرجعي للحوالة.',
+            style: TextStyle(color: Colors.white70),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'رفع صورة الإيصال يحتاج إعداد Storage في Supabase.',
+            style: TextStyle(
+              color: Colors.orangeAccent,
+              fontSize: 12,
             ),
           ),
         ] else ...[
           TextField(
             controller: destination,
             keyboardType: TextInputType.phone,
-            decoration: const InputDecoration(
-              labelText: 'رقم محفظتك لاستلام السحب',
-              hintText: 'أدخل رقم Orange Money أو رقم CliQ',
-              border: OutlineInputBorder(),
+            decoration: fieldDecoration(
+              'رقم محفظتك لاستلام السحب',
+              hint: 'رقم Orange Money أو CliQ',
             ),
           ),
           const SizedBox(height: 8),
           const Text(
-            'سيتم حجز المبلغ عند إرسال الطلب، '
-            'ويُنفذ التحويل يدوياً بعد المراجعة.',
+            'سيتم حجز المبلغ عند إرسال الطلب، ويُنفذ التحويل يدوياً بعد المراجعة.',
             style: TextStyle(color: Colors.white70),
           ),
         ],
-
         const SizedBox(height: 14),
-
         TextField(
           controller: amount,
           keyboardType: const TextInputType.numberWithOptions(
             decimal: true,
           ),
-          decoration: const InputDecoration(
-            labelText: 'المبلغ بالدينار الأردني',
-            hintText: 'من 1 إلى 200 JOD',
-            border: OutlineInputBorder(),
+          decoration: fieldDecoration(
+            'المبلغ بالدينار الأردني',
+            hint: 'من 1 إلى 200 JOD',
           ),
         ),
-
         const SizedBox(height: 22),
-
         SizedBox(
           height: 52,
           child: ElevatedButton(
@@ -368,7 +369,7 @@ class _WalletPageState extends State<WalletPage> {
               loading
                   ? 'يرجى الانتظار...'
                   : kind == 'deposit'
-                      ? 'تأكيد طلب الإيداع'
+                      ? 'تأكيد الإيداع'
                       : 'تأكيد طلب السحب',
             ),
           ),
