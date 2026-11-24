@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "799380638264",
+    "project_id": "mero-bet",
+    "storage_bucket": "mero-bet.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:799380638264:android:c96d0758c241c2a50074cd",
+        "android_client_info": {
+          "package_name": "com.example.mero_bet"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyD-QUbpzkj0ni99fBbCjx1KwcV26vKEYJA"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
