@@ -6,7 +6,7 @@ on:
 
 jobs:
   test-route64:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
 
     steps:
@@ -15,23 +15,25 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y wireguard-tools curl
 
-      - name: Configure Route64
+      - name: Configure and Test Route64
         env:
           WG_PRIVATE_KEY: ${{ secrets.WG_PRIVATE_KEY }}
         run: |
           set -euo pipefail
 
           if [ -z "$WG_PRIVATE_KEY" ]; then
-            echo "Missing WG_PRIVATE_KEY secret"
+            echo "ERROR: WG_PRIVATE_KEY secret is missing"
             exit 1
           fi
 
-          CONFIG="$RUNNER_TEMP/route64-test.conf"
+          CONFIG="/etc/wireguard/route64-test.conf"
 
-          umask 077
-          cat > "$CONFIG" <<EOF
+          sudo install -d -m 700 /etc/wireguard
+
+          sudo bash -c 'umask 077
+          cat > /etc/wireguard/route64-test.conf <<EOF
           [Interface]
-          PrivateKey = $WG_PRIVATE_KEY
+          PrivateKey = '"$WG_PRIVATE_KEY"'
           Address = 2a11:6c7:f35:1f6::2/64
           MTU = 1420
 
@@ -40,23 +42,34 @@ jobs:
           Endpoint = 23.154.9.27:20379
           AllowedIPs = ::/1, 8000::/1
           PersistentKeepalive = 15
-          EOF
+          EOF'
 
+          sudo chmod 600 "$CONFIG"
+
+          cleanup() {
+            sudo wg-quick down "$CONFIG" || true
+            sudo rm -f "$CONFIG"
+          }
+
+          trap cleanup EXIT
+
+          echo "Starting Route64 WireGuard..."
           sudo wg-quick up "$CONFIG"
 
-          echo "Waiting for WireGuard handshake..."
-          sleep 10
+          echo "Waiting for handshake..."
+          sleep 15
 
+          echo "WireGuard status:"
           sudo wg show
 
-          echo "Checking public IPv6..."
+          echo "Checking IPv6 connectivity..."
           curl -6 --fail --max-time 20 https://api64.ipify.org
 
           echo
-          echo "Route64 test completed"
+          echo "Route64 test completed successfully"
 
-      - name: Disconnect tunnel
+      - name: Cleanup
         if: always()
         run: |
-          sudo wg-quick down "$RUNNER_TEMP/route64-test.conf" || true
-          rm -f "$RUNNER_TEMP/route64-test.conf"
+          sudo wg-quick down /etc/wireguard/route64-test.conf || true
+          sudo rm -f /etc/wireguard/route64-test.conf
