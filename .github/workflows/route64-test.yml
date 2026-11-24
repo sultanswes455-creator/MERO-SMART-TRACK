@@ -1,0 +1,62 @@
+
+name: Route64 IPv6 Tunnel Test
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test-route64:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Install WireGuard
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wireguard-tools curl
+
+      - name: Configure Route64
+        env:
+          WG_PRIVATE_KEY: ${{ secrets.WG_PRIVATE_KEY }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "$WG_PRIVATE_KEY" ]; then
+            echo "Missing WG_PRIVATE_KEY secret"
+            exit 1
+          fi
+
+          CONFIG="$RUNNER_TEMP/route64-test.conf"
+
+          umask 077
+          cat > "$CONFIG" <<EOF
+          [Interface]
+          PrivateKey = $WG_PRIVATE_KEY
+          Address = 2a11:6c7:f35:1f6::2/64
+          MTU = 1420
+
+          [Peer]
+          PublicKey = B5Y0SJvgpZ4Xm2VR+GtQODteSJYC0uzshdR1/j0mUk4=
+          Endpoint = 23.154.9.27:20379
+          AllowedIPs = ::/1, 8000::/1
+          PersistentKeepalive = 15
+          EOF
+
+          sudo wg-quick up "$CONFIG"
+
+          echo "Waiting for WireGuard handshake..."
+          sleep 10
+
+          sudo wg show
+
+          echo "Checking public IPv6..."
+          curl -6 --fail --max-time 20 https://api64.ipify.org
+
+          echo
+          echo "Route64 test completed"
+
+      - name: Disconnect tunnel
+        if: always()
+        run: |
+          sudo wg-quick down "$RUNNER_TEMP/route64-test.conf" || true
+          rm -f "$RUNNER_TEMP/route64-test.conf"
