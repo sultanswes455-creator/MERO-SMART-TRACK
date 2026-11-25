@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -564,9 +563,10 @@ class _AdminPageState extends State<AdminPage>
             final request = requests[index];
             final id = request['id'].toString();
 
-            // المبلغ مخزن بالدينار في قاعدة البيانات
-            final amount =
-                (request['amount'] as num?)?.toDouble() ?? 0;
+            // المبلغ مخزن بالفلس: 1000 فلس = 1 دينار
+            final amountFils =
+                (request['amount_fils'] as num?)?.toDouble() ?? 0;
+            final amount = amountFils / 1000;
 
             final deposit = request['kind'] == 'deposit';
             final profile = request['profiles'];
@@ -575,7 +575,7 @@ class _AdminPageState extends State<AdminPage>
 
             // اسم العمود الصحيح في قاعدة البيانات
             final method =
-                (request['payment_method'] ?? '-').toString();
+                (request['method'] ?? '-').toString();
 
             final senderDetails =
                 (request['payment_reference'] ?? '').toString();
@@ -869,201 +869,4 @@ class _AdminPageState extends State<AdminPage>
           .select('*, selections(label, odds, result)')
           .eq('bet_id', betId),
       builder: (context, snapshot) {
-        if (snapshot.hasError) {
-          return Text(
-            'تعذر تحميل تفاصيل القسيمة: ${snapshot.error}',
-          );
-        }
-
-        if (!snapshot.hasData) {
-          return const Padding(
-            padding: EdgeInsets.all(8),
-            child: LinearProgressIndicator(),
-          );
-        }
-
-        final items = snapshot.data ?? [];
-
-        return Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: items.map((item) {
-            final selection = item['selections'];
-
-            final label = selection is Map
-                ? selection['label'] ?? 'اختيار'
-                : 'اختيار غير متاح';
-
-            final result = selection is Map
-                ? selection['result'] ?? 'غير معروف'
-                : 'غير معروف';
-
-            return Padding(
-              padding: const EdgeInsets.symmetric(vertical: 4),
-              child: Text(
-                '$label | المعامل: ${item['odds_snapshot']} | النتيجة: $result',
-              ),
-            );
-          }).toList(),
-        );
-      },
-    );
-  }
-
-  Widget betsTab() {
-    return FutureBuilder<List<Map<String, dynamic>>>(
-      future: db
-          .from('bets')
-          .select()
-          .order('created_at', ascending: false),
-      builder: (context, snapshot) {
-        if (snapshot.connectionState ==
-            ConnectionState.waiting) {
-          return const Center(
-            child: CircularProgressIndicator(),
-          );
-        }
-
-        if (snapshot.hasError) {
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Text(
-                'تعذر تحميل الرهانات: ${snapshot.error}',
-              ),
-            ),
-          );
-        }
-
-        final bets = snapshot.data ?? [];
-
-        if (bets.isEmpty) {
-          return const Center(
-            child: Text('لا توجد رهانات'),
-          );
-        }
-
-        return ListView.builder(
-          padding: const EdgeInsets.all(12),
-          itemCount: bets.length,
-          itemBuilder: (context, index) {
-            final bet = bets[index];
-            final id = bet['id'].toString();
-            final status = bet['status'].toString();
-
-            final stake =
-                (bet['stake'] as num?)?.toDouble() ?? 0;
-
-            final odds =
-                (bet['total_odds'] as num?)?.toDouble() ?? 0;
-
-            final potential =
-                (bet['potential_return'] as num?)?.toDouble() ?? 0;
-
-            return Card(
-              color: adminSurface,
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  crossAxisAlignment:
-                      CrossAxisAlignment.stretch,
-                  children: [
-                    Text(
-                      'رهان ${index + 1}',
-                      style: const TextStyle(
-                        color: adminGold,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 17,
-                      ),
-                    ),
-                    SelectableText(
-                      'رقم القسيمة: $id',
-                      style: const TextStyle(fontSize: 11),
-                    ),
-                    SelectableText(
-                      'معرّف اللاعب: ${bet['user_id']}',
-                    ),
-                    Text(
-                      'المبلغ: ${stake.toStringAsFixed(2)} د.أ',
-                    ),
-                    Text(
-                      'المعامل الإجمالي: ${odds.toStringAsFixed(2)}',
-                    ),
-                    Text(
-                      'العائد المحتمل: ${potential.toStringAsFixed(2)} د.أ',
-                    ),
-                    Text('الحالة: $status'),
-                    Text('التاريخ: ${bet['created_at']}'),
-                    const Divider(),
-                    const Text(
-                      'تفاصيل الاختيارات:',
-                      style: TextStyle(color: adminGold),
-                    ),
-                    betItems(id),
-                    if (status == 'open')
-                      ElevatedButton.icon(
-                        onPressed: () => settleBet(id),
-                        icon: const Icon(Icons.check_circle),
-                        label: const Text('تسوية القسيمة'),
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: adminGold,
-                          foregroundColor: Colors.black,
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            );
-          },
-        );
-      },
-    );
-  }
-
-  // ---------------- واجهة الإدارة ----------------
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        Material(
-          color: adminSurface,
-          child: TabBar(
-            controller: tabs,
-            isScrollable: true,
-            labelColor: adminGold,
-            unselectedLabelColor: Colors.white70,
-            tabs: const [
-              Tab(
-                icon: Icon(Icons.sports_soccer),
-                text: 'المباريات',
-              ),
-              Tab(
-                icon: Icon(Icons.account_balance_wallet),
-                text: 'طلبات المحفظة',
-              ),
-              Tab(
-                icon: Icon(Icons.people),
-                text: 'المستخدمون',
-              ),
-              Tab(
-                icon: Icon(Icons.receipt_long),
-                text: 'الرهانات',
-              ),
-            ],
-          ),
-        ),
-        Expanded(
-          child: TabBarView(
-            controller: tabs,
-            children: [
-              eventsTab(),
-              requestsTab(),
-              usersTab(),
-              betsTab(),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-}
+        if (
