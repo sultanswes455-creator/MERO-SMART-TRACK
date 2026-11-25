@@ -1,3 +1,4 @@
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -498,7 +499,14 @@ class _AdminPageState extends State<AdminPage>
     }
   }
 
-  Future<void> reviewRequest(String id, bool approve) async {
+  // الموافقة على الطلب تتم أولاً عبر RPC المحفظة.
+  // بعدها فقط نطلب إرسال الإشعار إذا كان الطلب إيداعاً.
+  // فشل الإشعار لا يلغي الموافقة ولا يعيد تنفيذ عملية المحفظة.
+  Future<void> reviewRequest(
+    String id,
+    bool approve, {
+    required bool isDeposit,
+  }) async {
     try {
       await db.rpc(
         'mero_review_wallet_request',
@@ -508,11 +516,31 @@ class _AdminPageState extends State<AdminPage>
         },
       );
 
-      message(
-        approve
-            ? 'تمت الموافقة على الطلب'
-            : 'تم رفض الطلب',
-      );
+      if (approve && isDeposit) {
+        try {
+          await db.functions.invoke(
+            'send-deposit-notification',
+            body: {
+              'request_id': id,
+            },
+          );
+
+          message(
+            'تمت الموافقة على الإيداع وإرسال طلب الإشعار',
+          );
+        } catch (notificationError) {
+          message(
+            'تمت الموافقة على الإيداع، لكن تعذر إرسال الإشعار: '
+            '$notificationError',
+          );
+        }
+      } else {
+        message(
+          approve
+              ? 'تمت الموافقة على طلب السحب'
+              : 'تم رفض الطلب',
+        );
+      }
 
       refresh();
     } catch (e) {
@@ -573,7 +601,6 @@ class _AdminPageState extends State<AdminPage>
             final playerName =
                 profile is Map ? profile['display_name'] : null;
 
-            // اسم العمود الصحيح في قاعدة البيانات
             final method =
                 (request['method'] ?? '-').toString();
 
@@ -641,8 +668,11 @@ class _AdminPageState extends State<AdminPage>
                       children: [
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () =>
-                                reviewRequest(id, true),
+                            onPressed: () => reviewRequest(
+                              id,
+                              true,
+                              isDeposit: deposit,
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.green,
                               foregroundColor: Colors.white,
@@ -653,8 +683,11 @@ class _AdminPageState extends State<AdminPage>
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton(
-                            onPressed: () =>
-                                reviewRequest(id, false),
+                            onPressed: () => reviewRequest(
+                              id,
+                              false,
+                              isDeposit: deposit,
+                            ),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: Colors.red,
                               foregroundColor: Colors.white,
