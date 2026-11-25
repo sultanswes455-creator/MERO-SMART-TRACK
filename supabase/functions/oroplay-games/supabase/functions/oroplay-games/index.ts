@@ -32,11 +32,7 @@ function json(data: unknown, status = 200): Response {
 }
 
 function failure(message: string, errorCode = 500, status = 200) {
-  return json({
-    success: false,
-    message,
-    errorCode,
-  }, status);
+  return json({ success: false, message, errorCode }, status);
 }
 
 async function getOroPlayToken(): Promise<string> {
@@ -46,30 +42,43 @@ async function getOroPlayToken(): Promise<string> {
     return cachedToken;
   }
 
-  const response = await fetch(
-    `${BASE_URL}/auth/createtoken`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Accept": "application/json",
-      },
-      body: JSON.stringify({
-        clientId: CLIENT_ID,
-        clientSecret: CLIENT_SECRET,
-      }),
-      signal: AbortSignal.timeout(20000),
-    },
-  );
+  const apiUrl = `${BASE_URL}/auth/createtoken`;
 
-  const data = await response.json();
+  const response = await fetch(apiUrl, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json",
+    },
+    body: JSON.stringify({
+      clientId: CLIENT_ID,
+      clientSecret: CLIENT_SECRET,
+    }),
+    signal: AbortSignal.timeout(20000),
+  });
+
+  const responseText = await response.text();
+
+  let data: any;
+
+  try {
+    data = JSON.parse(responseText);
+  } catch {
+    console.error("OroPlay token API response:", {
+      url: apiUrl,
+      httpStatus: response.status,
+      responseBody: responseText.slice(0, 2000),
+    });
+    throw new Error("استجابة OroPlay ليست JSON");
+  }
 
   if (!response.ok || !data.token) {
-    console.error(
-      "OroPlay token request failed:",
-      response.status,
-      data.errorCode ?? "unknown",
-    );
+    console.error("OroPlay token API response:", {
+      url: apiUrl,
+      httpStatus: response.status,
+      errorCode: data.errorCode ?? null,
+      message: data.message ?? null,
+    });
 
     throw new Error("تعذر الحصول على رمز OroPlay");
   }
@@ -103,23 +112,28 @@ async function callOroPlay(
     signal: AbortSignal.timeout(30000),
   });
 
-  const text = await response.text();
+  const responseText = await response.text();
 
   let data: any;
 
   try {
-    data = JSON.parse(text);
+    data = JSON.parse(responseText);
   } catch {
+    console.error("OroPlay API invalid JSON:", {
+      url: `${BASE_URL}${path}`,
+      httpStatus: response.status,
+      responseBody: responseText.slice(0, 2000),
+    });
     throw new Error("استجابة OroPlay ليست JSON");
   }
 
   if (!response.ok || data.success === false) {
-    console.error(
-      "OroPlay API error:",
-      path,
-      response.status,
-      data.errorCode ?? "unknown",
-    );
+    console.error("OroPlay API error:", {
+      url: `${BASE_URL}${path}`,
+      httpStatus: response.status,
+      errorCode: data.errorCode ?? null,
+      message: data.message ?? null,
+    });
 
     throw new Error(
       `فشل طلب OroPlay (${data.errorCode ?? response.status})`,
@@ -200,25 +214,14 @@ Deno.serve(async (req: Request) => {
   const action = String(body.action ?? "").trim();
 
   try {
-    // قائمة شركات الألعاب
     if (action === "vendors") {
-      const result = await callOroPlay(
-        "/vendors/list",
-        "GET",
-      );
-
+      const result = await callOroPlay("/vendors/list", "GET");
       return json(result);
     }
 
-    // قائمة الألعاب الخاصة بالشركة
     if (action === "games") {
-      const vendorCode = String(
-        body.vendorCode ?? "",
-      ).trim();
-
-      const language = String(
-        body.language ?? "en",
-      ).trim();
+      const vendorCode = String(body.vendorCode ?? "").trim();
+      const language = String(body.language ?? "en").trim();
 
       if (!vendorCode) {
         return failure("vendorCode is required", 400);
@@ -227,24 +230,15 @@ Deno.serve(async (req: Request) => {
       const result = await callOroPlay(
         "/games/list",
         "POST",
-        {
-          vendorCode,
-          language,
-        },
+        { vendorCode, language },
       );
 
       return json(result);
     }
 
-    // تفاصيل اللعبة
     if (action === "detail") {
-      const vendorCode = String(
-        body.vendorCode ?? "",
-      ).trim();
-
-      const gameCode = String(
-        body.gameCode ?? "",
-      ).trim();
+      const vendorCode = String(body.vendorCode ?? "").trim();
+      const gameCode = String(body.gameCode ?? "").trim();
 
       if (!vendorCode || !gameCode) {
         return failure(
@@ -256,28 +250,16 @@ Deno.serve(async (req: Request) => {
       const result = await callOroPlay(
         "/game/detail",
         "POST",
-        {
-          vendorCode,
-          gameCode,
-        },
+        { vendorCode, gameCode },
       );
 
       return json(result);
     }
 
-    // تشغيل اللعبة بحساب اللاعب الحقيقي
     if (action === "launch") {
-      const vendorCode = String(
-        body.vendorCode ?? "",
-      ).trim();
-
-      const gameCode = String(
-        body.gameCode ?? "",
-      ).trim();
-
-      const language = String(
-        body.language ?? "en",
-      ).trim();
+      const vendorCode = String(body.vendorCode ?? "").trim();
+      const gameCode = String(body.gameCode ?? "").trim();
+      const language = String(body.language ?? "en").trim();
 
       if (!vendorCode || !gameCode) {
         return failure(
