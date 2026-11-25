@@ -2,6 +2,8 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 
@@ -19,12 +21,78 @@ const surface = Color(0xFF1B202B);
 
 final supabase = Supabase.instance.client;
 
+final GlobalKey<ScaffoldMessengerState> appMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
+@pragma('vm:entry-point')
+Future<void> firebaseMessagingBackgroundHandler(
+  RemoteMessage message,
+) async {
+  // Android يعرض إشعارات FCM تلقائياً عندما يكون التطبيق بالخلفية أو مغلقاً.
+}
+
+Future<void> initializePushNotifications() async {
+  try {
+    final messaging = FirebaseMessaging.instance;
+
+    await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+    );
+
+    Future<void> registerToken(String? token) async {
+      final user = supabase.auth.currentUser;
+
+      if (token == null || token.isEmpty || user == null) {
+        return;
+      }
+
+      try {
+        await supabase.rpc(
+          'mero_register_push_token',
+          params: {
+            'p_token': token,
+            'p_platform': 'android',
+          },
+        );
+      } catch (error) {
+        debugPrint('Push token registration failed: $error');
+      }
+    }
+
+    await registerToken(await messaging.getToken());
+
+    messaging.onTokenRefresh.listen(registerToken);
+
+    FirebaseMessaging.onMessage.listen((message) {
+      final body = message.notification?.body ??
+          message.data['body']?.toString();
+
+      if (body != null && body.isNotEmpty) {
+        appMessengerKey.currentState?.showSnackBar(
+          SnackBar(content: Text(body)),
+        );
+      }
+    });
+  } catch (error) {
+    // فشل الإشعارات لا يعطل الدخول أو المحفظة.
+    debugPrint('Push notification setup failed: $error');
+  }
+}
+
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   await Supabase.initialize(
     url: supabaseUrl,
     publishableKey: supabasePublishableKey,
+  );
+
+  await Firebase.initializeApp();
+
+  FirebaseMessaging.onBackgroundMessage(
+    firebaseMessagingBackgroundHandler,
   );
 
   runApp(const MeroBetApp());
@@ -36,6 +104,7 @@ class MeroBetApp extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      scaffoldMessengerKey: appMessengerKey,
       debugShowCheckedModeBanner: false,
       title: 'MERO BET',
       theme: ThemeData(
@@ -225,6 +294,8 @@ class _MainScreenState extends State<MainScreen> {
   @override
   void initState() {
     super.initState();
+
+    unawaited(initializePushNotifications());
 
     ownerFuture = checkOwner();
     balanceFuture = getBalance();
