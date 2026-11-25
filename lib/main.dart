@@ -1,4 +1,3 @@
-
 import 'dart:async';
 
 import 'package:flutter/material.dart';
@@ -28,7 +27,15 @@ final GlobalKey<ScaffoldMessengerState> appMessengerKey =
 Future<void> firebaseMessagingBackgroundHandler(
   RemoteMessage message,
 ) async {
-  // Android يعرض إشعارات FCM تلقائياً عندما يكون التطبيق بالخلفية أو مغلقاً.
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: 'AIzaSyD-QUbpzkj0ni99fBbCjx1KwcV26vKEYJA',
+      appId: '1:799380638264:android:c96d0758c241c2a50074cd',
+      messagingSenderId: '799380638264',
+      projectId: 'mero-bet',
+      storageBucket: 'mero-bet.firebasestorage.app',
+    ),
+  );
 }
 
 Future<void> initializePushNotifications() async {
@@ -76,7 +83,6 @@ Future<void> initializePushNotifications() async {
       }
     });
   } catch (error) {
-    // فشل الإشعارات لا يعطل الدخول أو المحفظة.
     debugPrint('Push notification setup failed: $error');
   }
 }
@@ -89,7 +95,15 @@ Future<void> main() async {
     publishableKey: supabasePublishableKey,
   );
 
-  await Firebase.initializeApp();
+  await Firebase.initializeApp(
+    options: const FirebaseOptions(
+      apiKey: 'AIzaSyD-QUbpzkj0ni99fBbCjx1KwcV26vKEYJA',
+      appId: '1:799380638264:android:c96d0758c241c2a50074cd',
+      messagingSenderId: '799380638264',
+      projectId: 'mero-bet',
+      storageBucket: 'mero-bet.firebasestorage.app',
+    ),
+  );
 
   FirebaseMessaging.onBackgroundMessage(
     firebaseMessagingBackgroundHandler,
@@ -135,6 +149,7 @@ class AuthGate extends StatelessWidget {
         if (supabase.auth.currentSession != null) {
           return const MainScreen();
         }
+
         return const LoginPage();
       },
     );
@@ -185,7 +200,9 @@ class _LoginPageState extends State<LoginPage> {
     } catch (e) {
       message('حدث خطأ أثناء الاتصال: $e');
     } finally {
-      if (mounted) setState(() => loading = false);
+      if (mounted) {
+        setState(() => loading = false);
+      }
     }
   }
 
@@ -260,7 +277,9 @@ class _LoginPageState extends State<LoginPage> {
                 ),
               ),
               TextButton(
-                onPressed: () => setState(() => isRegister = !isRegister),
+                onPressed: () {
+                  setState(() => isRegister = !isRegister);
+                },
                 child: Text(
                   isRegister
                       ? 'لديك حساب؟ سجل الدخول'
@@ -304,6 +323,7 @@ class _MainScreenState extends State<MainScreen> {
       const Duration(seconds: 5),
       (_) {
         if (!mounted) return;
+
         setState(() {
           balanceFuture = getBalance();
         });
@@ -319,6 +339,7 @@ class _MainScreenState extends State<MainScreen> {
 
   Future<bool> checkOwner() async {
     final user = supabase.auth.currentUser;
+
     if (user == null) return false;
 
     try {
@@ -465,6 +486,7 @@ class _MainScreenState extends State<MainScreen> {
             onDestinationSelected: (value) {
               setState(() {
                 page = value;
+
                 if (value == 2) {
                   balanceFuture = getBalance();
                 }
@@ -543,6 +565,7 @@ class _CasinoPageState extends State<CasinoPage> {
 
       if (loaded.isNotEmpty) {
         final firstCode = loaded.first['vendorCode']?.toString();
+
         if (firstCode != null && firstCode.isNotEmpty) {
           await selectVendor(firstCode);
         }
@@ -670,6 +693,7 @@ class _CasinoPageState extends State<CasinoPage> {
         Navigator.of(context).pop();
         dialogOpen = false;
       }
+
       showMessage('تفاصيل خطأ تشغيل اللعبة: $e');
     }
   }
@@ -883,7 +907,9 @@ class _OroPlayGamePageState extends State<OroPlayGamePage> {
             }
           },
           onPageFinished: (_) {
-            if (mounted) setState(() => loading = false);
+            if (mounted) {
+              setState(() => loading = false);
+            }
           },
           onWebResourceError: (details) {
             if (mounted && details.isForMainFrame == true) {
