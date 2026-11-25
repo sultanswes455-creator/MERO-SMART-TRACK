@@ -1,0 +1,3 @@
+
+[functions.oroplay-wallet]
+verify_jwt = false
