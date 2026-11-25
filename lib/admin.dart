@@ -591,10 +591,9 @@ class _AdminPageState extends State<AdminPage>
             final request = requests[index];
             final id = request['id'].toString();
 
-            // المبلغ مخزن بالفلس: 1000 فلس = 1 دينار
-            final amountFils =
-                (request['amount_fils'] as num?)?.toDouble() ?? 0;
-            final amount = amountFils / 1000;
+            // المبلغ مخزن بالدينار في wallet_requests.amount
+            final amount =
+                (request['amount'] as num?)?.toDouble() ?? 0;
 
             final deposit = request['kind'] == 'deposit';
             final profile = request['profiles'];
@@ -602,7 +601,7 @@ class _AdminPageState extends State<AdminPage>
                 profile is Map ? profile['display_name'] : null;
 
             final method =
-                (request['method'] ?? '-').toString();
+                (request['payment_method'] ?? '-').toString();
 
             final senderDetails =
                 (request['payment_reference'] ?? '').toString();
