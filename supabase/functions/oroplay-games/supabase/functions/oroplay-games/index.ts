@@ -64,23 +64,35 @@ async function getOroPlayToken(): Promise<string> {
   try {
     data = JSON.parse(responseText);
   } catch {
-    console.error("OroPlay token API response:", {
-      url: apiUrl,
-      httpStatus: response.status,
-      responseBody: responseText.slice(0, 2000),
-    });
-    throw new Error("استجابة OroPlay ليست JSON");
+    console.error(
+      "OROPLAY_RAW_TOKEN_RESPONSE",
+      JSON.stringify({
+        url: apiUrl,
+        httpStatus: response.status,
+        contentType: response.headers.get("content-type"),
+        responseBody: responseText.slice(0, 4000),
+      }),
+    );
+
+    throw new Error(
+      `OroPlay token response is not JSON: ${responseText.slice(0, 1000)}`,
+    );
   }
 
   if (!response.ok || !data.token) {
-    console.error("OroPlay token API response:", {
-      url: apiUrl,
-      httpStatus: response.status,
-      errorCode: data.errorCode ?? null,
-      message: data.message ?? null,
-    });
+    console.error(
+      "OROPLAY_TOKEN_AUTH_ERROR",
+      JSON.stringify({
+        url: apiUrl,
+        httpStatus: response.status,
+        errorCode: data.errorCode ?? null,
+        message: data.message ?? null,
+      }),
+    );
 
-    throw new Error("تعذر الحصول على رمز OroPlay");
+    throw new Error(
+      `OroPlay token failed: ${data.message ?? data.errorCode ?? response.status}`,
+    );
   }
 
   cachedToken = String(data.token);
@@ -101,7 +113,9 @@ async function callOroPlay(
 ): Promise<any> {
   const token = await getOroPlayToken();
 
-  const response = await fetch(`${BASE_URL}${path}`, {
+  const apiUrl = `${BASE_URL}${path}`;
+
+  const response = await fetch(apiUrl, {
     method,
     headers: {
       "Authorization": `Bearer ${token}`,
@@ -119,24 +133,34 @@ async function callOroPlay(
   try {
     data = JSON.parse(responseText);
   } catch {
-    console.error("OroPlay API invalid JSON:", {
-      url: `${BASE_URL}${path}`,
-      httpStatus: response.status,
-      responseBody: responseText.slice(0, 2000),
-    });
-    throw new Error("استجابة OroPlay ليست JSON");
+    console.error(
+      "OROPLAY_RAW_API_RESPONSE",
+      JSON.stringify({
+        url: apiUrl,
+        httpStatus: response.status,
+        contentType: response.headers.get("content-type"),
+        responseBody: responseText.slice(0, 4000),
+      }),
+    );
+
+    throw new Error(
+      `OroPlay API response is not JSON: ${responseText.slice(0, 1000)}`,
+    );
   }
 
   if (!response.ok || data.success === false) {
-    console.error("OroPlay API error:", {
-      url: `${BASE_URL}${path}`,
-      httpStatus: response.status,
-      errorCode: data.errorCode ?? null,
-      message: data.message ?? null,
-    });
+    console.error(
+      "OROPLAY_API_ERROR",
+      JSON.stringify({
+        url: apiUrl,
+        httpStatus: response.status,
+        errorCode: data.errorCode ?? null,
+        message: data.message ?? null,
+      }),
+    );
 
     throw new Error(
-      `فشل طلب OroPlay (${data.errorCode ?? response.status})`,
+      `OroPlay request failed: ${data.message ?? data.errorCode ?? response.status}`,
     );
   }
 
@@ -300,15 +324,12 @@ Deno.serve(async (req: Request) => {
 
     return failure("Unknown action", 400);
   } catch (error) {
-    console.error(
-      "oroplay-games error:",
-      error instanceof Error ? error.message : "unknown",
-    );
+    const errorMessage = error instanceof Error
+      ? error.message
+      : "OroPlay request failed";
 
-    return failure(
-      error instanceof Error
-        ? error.message
-        : "OroPlay request failed",
-    );
+    console.error("oroplay-games error:", errorMessage);
+
+    return failure(errorMessage);
   }
 });
