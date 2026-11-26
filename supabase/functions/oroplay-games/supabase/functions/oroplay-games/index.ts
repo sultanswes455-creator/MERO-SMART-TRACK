@@ -11,7 +11,7 @@ const corsHeaders = {
 const BASE_URL = (
   Deno.env.get("OROPLAY_BASE_URL") ??
   "https://bs.sxvwlkohlv.com/api/v2"
-).replace(/\/+$/, "");
+).replace(/\s+/g, "").replace(/\/+$/, "");
 
 const CLIENT_ID = Deno.env.get("OROPLAY_CLIENT_ID") ?? "";
 const CLIENT_SECRET = Deno.env.get("OROPLAY_CLIENT_SECRET") ?? "";
